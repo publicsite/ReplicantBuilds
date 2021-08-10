@@ -1,0 +1,5 @@
+When initing replicant 4.2 source code, use...
+
+repo init -u https://code.fossencdi.org/replicant_manifest.git -b replicant-4.2
+
+... instead as this contains TLS 1.2, that allows for browser HTTPS connections to newer sites
