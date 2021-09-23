@@ -1,0 +1,11 @@
+type ofono, domain;
+type ofono_exec, exec_type, file_type;
+
+init_daemon_domain(ofono)
+
+unix_socket_connect(ofono, dbus_daemon, dbus_daemon)
+
+allow ofono radio_data_file:dir create_dir_perms;
+allow ofono radio_data_file:file_class_set create_file_perms;
+# TODO restrict to only the one pty we need?
+allow ofono devpts:chr_file rw_file_perms;

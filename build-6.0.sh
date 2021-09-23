@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd /Sources
+cd "$(dirname "$0")"
 
 if [ -f 1.txt ]; then
 rm 1.txt
@@ -16,13 +16,13 @@ fi
 
 thepwd="$PWD"
 
-export JAVA_HOME=/Sources/java-se-7u75-ri
-export JRE_HOME=${JAVA_HOME}/jre
-export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib:${JRE_HOME}/lib/amd64:${JRE_HOME}/lib/amd64/jli
-export LD_LIBRARY_PATH="${JAVA_HOME}/lib:${JRE_HOME}/lib:${JRE_HOME}/lib/amd64:${JRE_HOME}/lib/amd64/jli:${LD_LIBRARY_PATH}"
-export PATH=${JAVA_HOME}/bin:$PATH
+#export JAVA_HOME=/Sources/java-se-7u75-ri
+#export JRE_HOME=${JAVA_HOME}/jre
+#export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib:${JRE_HOME}/lib/amd64:${JRE_HOME}/lib/amd64/jli
+#export LD_LIBRARY_PATH="${JAVA_HOME}/lib:${JRE_HOME}/lib:${JRE_HOME}/lib/amd64:${JRE_HOME}/lib/amd64/jli:${LD_LIBRARY_PATH}"
+#export PATH=${JAVA_HOME}/bin:$PATH
 
-cd $thepwd/replicant-4.2
+cd $thepwd/replicant-6.0
 
 ####==================================
 
@@ -101,15 +101,20 @@ sed -i "s#-Xmx512M#-Xmx512M -J-Xss10M#" build/core/combo/javac.mk
 
 ###===================
 
+#For a clean build
+make clean
+
+#First, the toolchain needs to be built
+./vendor/replicant/build-toolchain
+
 ##build sources
-source build/envsetup.sh
-lunch replicant_crespo-eng
+. build/envsetup.sh
+lunch replicant_i9305-userdebug
 
 ##start the build
 #parallel_tasks=$(echo "$(grep 'processor' /proc/cpuinfo | wc -l ) + 1" | bc)
 #make -j$parallel_tasks bacon
-
-make clean
+parallel_tasks="1"
 
 #see definitions.mk
 #see javac.mk
@@ -120,3 +125,6 @@ make -j$parallel_tasks recoveryimage 2>&1 | tee "${thepwd}/1.txt"
 ##replicant-4.2/out/target/product/crespo/boot.img
 make -j$parallel_tasks bootimage 2>&1 | tee "${thepwd}/2.txt"
 make -j$parallel_tasks systemimage 2>&1 | tee "${thepwd}/3.txt"
+
+#to sign the images
+#./vendor/replicant/sign-build i9305

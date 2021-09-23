@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")"
+
 printf "This will require ~140GB\n"
 
 #sudo apt-get build-dep gcc binutils llvm-defaults
@@ -25,33 +27,39 @@ sudo tar xf sz1lkq3ryr5iv6amy6f3d2pziks27g28-tarball-pack.tar.xz -C /
 
 source /usr/local/bin/repo-env.sh
 
-mkdir replicant-4.2
-cd replicant-4.2
-git config --global user.email "dontcall@me.com"
-git config --global user.name "Absolutely Anonymous"
+mkdir replicant-6.0
+cd replicant-6.0
+#git config --global user.email "dontcall@me.com"
+#git config --global user.name "Absolutely Anonymous"
 
-#git clone https://code.fossencdi.org/replicant_manifest.git -b replicant-4.2
-
-mkdir -p manifest
-cp ./replicant_manifest/default.xml manifest/
-cd manifest
-git init
-git add default.xml
-git commit -m "My local manifest"
-cd ..
-repo init -u manifest
+repo init -u https://git.replicant.us/contrib/scintill/manifest.git -b replicant-6.0
 repo sync
 
-##get fdroid prebuilt apps
-#gpg --keyserver keys.gnupg.net --recv-key 37D2C98789D8311948394E3E41E7044E1DBA2E89
-#vendor/replicant/get-prebuilts
+#get fdroid prebuilt apps
+gpg --keyserver keys.gnupg.net --recv-key 37D2C98789D8311948394E3E41E7044E1DBA2E89
+vendor/replicant/get-prebuilts
 
-#cd ..
-#mkdir replicant-6.0
-#cd replicant-6.0
-#repo init -u https://git.replicant.us/replicant/manifest.git -b refs/tags/replicant-6.0-0004-rc2
+cd replicant-6.0/device/samsung/i9305
 
-##get fdroid prebuilt apps
-#gpg --keyserver keys.gnupg.net --recv-key 37D2C98789D8311948394E3E41E7044E1DBA2E89
-#vendor/replicant/get-prebuilts
+#these patches were created with "diff -du"
+#from the instructions at https://redmine.replicant.us/issues/1958
+patch -p0 < ../../../../patches/init.target.rc.patch
+patch -p0 < ../../../../patches/ueventd.smdk4x12.rc.patch
+patch -p0 < ../../../../patches/i9305.mk.patch
+patch -p0 < ../../../../patches/file_contexts.patch
+
+cp ../../../../patches/dbus.te selinux/dbus.te
+cp ../../../../patches/file.te selinux/file.te
+cp ../../../../patches/ofono.te selinux/ofono.te
+cp ../../../../patches/radio.te selinux/radio.te
+cp ../../../../patches/mdm9k.te selinux/mdm9k-efsd.te
+
+cd ../../../external/sepolicy
+
+#I'm not really sure if this patch is needed.
+#If you check dmesg, you find out that SELinux looks to be blocking some stuff.
+#I mean, not just the stuff in this patch ...
+#... but idk, it's what I did ...
+# so ...
+patch -p0 < ../../../patches/init.te.patch
 

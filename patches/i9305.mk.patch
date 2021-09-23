@@ -1,0 +1,11 @@
+--- i9305.mk.old	2021-08-13 21:25:42.002662000 +0100
++++ i9305.mk	2021-08-26 20:30:30.269940062 +0100
+@@ -32,6 +32,8 @@
+     $(LOCAL_PATH)/rootdir/init.target.rc:root/init.target.rc \
+     $(LOCAL_PATH)/rootdir/ueventd.smdk4x12.rc:root/ueventd.smdk4x12.rc
+ 
++include frameworks/opt/telephony_ril_ofono/ofono-qmi.mk
++
+ # Audio
+ PRODUCT_COPY_FILES += \
+     $(LOCAL_PATH)/configs/tiny_hw.xml:system/etc/sound/m3

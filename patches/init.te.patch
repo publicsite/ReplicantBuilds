@@ -1,0 +1,21 @@
+--- init.te.old	2021-09-20 14:57:13.970990274 +0000
++++ init.te	2021-09-20 15:02:21.847812772 +0000
+@@ -75,6 +75,12 @@
+ 
+ allow init self:capability { sys_rawio mknod };
+ 
++#Run helpers from / or /system without changing domain.
++#We do not include exec_type here since those
++#should always involve a domain transition.
++allow init rootfs:file execute_no_trans;
++allow init system_file:file execute_no_trans;
++
+ # Mounting filesystems from block devices.
+ allow init dev_type:blk_file r_file_perms;
+ 
+@@ -290,5 +296,3 @@
+ neverallow init shell_data_file:lnk_file read;
+ neverallow init app_data_file:lnk_file read;
+ 
+-# init should never execute a program without changing to another domain.
+-neverallow init { file_type fs_type }:file execute_no_trans;

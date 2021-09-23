@@ -1,0 +1,11 @@
+--- rootdir/init.target.rc.old	2021-08-13 21:25:42.010662000 +0100
++++ rootdir/init.target.rc	2021-08-15 16:57:52.342612133 +0100
+@@ -2,6 +2,8 @@
+ on init
+ #########################################################################################################################
+ 
++import init.ofono-qmi.rc
++
+ # Vibetonz
+     export VIBE_PIPE_PATH /dev/pipes
+     mkdir /dev/pipes 0771 shell shell

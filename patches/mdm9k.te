@@ -1,0 +1,9 @@
+type mdm9k-efsd, domain;
+type mdm9k-efsd_exec, exec_type, file_type;
+
+init_daemon_domain(mdm9k-efsd)
+
+type mdm9k-boot, domain;
+type mdm9k-boot_exec, exec_type, file_type;
+
+init_daemon_domain(mdm9k-boot)

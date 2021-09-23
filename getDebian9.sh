@@ -6,12 +6,20 @@ unsquashfs isomountpoint/live/filesystem.squashfs
 sudo umount isomountpoint
 rmdir isomountpoint
 mkdir squashfs-root/Sources
-mv replicant-4.2 squashfs-root/Sources/
-cp -a do.sh squashfs-root/Sources/
-cp -a userBuild.sh squashfs-root/Sources/
+cp -a getSource-4.2 squashfs-root/Sources/
+cp -a do-4.2.sh squashfs-root/Sources/
+cp -a build-4.2.sh squashfs-root/Sources/
+cp -a getSource-6.0 squashfs-root/Sources/
+cp -a do-6.0.sh squashfs-root/Sources/
+cp -a build-6.0.sh squashfs-root/Sources/
 cp -a /etc/resolv.conf squashfs-root/etc/
+cp -a patches squashfs-root/Sources/
 printf "SET THE PASSWORD AS \"live\"\n"
 sudo chroot squashfs-root adduser live
 sudo chroot usermod -aG sudo live
 sudo chroot squashfs-root sed -i "s&#deb-src http://deb.debian.org/debian/ stretch main&deb-src http://deb.debian.org/debian/ stretch main&g" /etc/apt/sources.list
-sudo chroot /Sources/do.sh squashfs-root
+
+sudo chroot /Sources/getSource-4.2.sh squashfs-root
+sudo chroot /Sources/do-4.2.sh squashfs-root
+sudo chroot /Sources/getSource-6.0.sh squashfs-root
+sudo chroot /Sources/do-6.0.sh squashfs-root
