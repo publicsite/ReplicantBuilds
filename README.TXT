@@ -19,14 +19,12 @@ _________________________________________
 
 Scintill's fork of replicant 6.0 (incomplete ported to the i9305)
 
-- Modem in images do not work, and images are for testing purposes only.
-- SELinux rules need review.
-- How to apply patches, is in getSource-6.0.sh
-- mdm9k-boot service does not start on boot, most of it needs to be started manually.
-- On the i9305, the device file /dev/cdc-wdm2 does not exist and needs to be changed in init.ofono-qmi.rc
-- Use dbus to test ofono
+This is a port of Scintill's version of Replicant 6.0 to the i9305.
+
+Data and SMSs work. Calls connect but no audio, unfortunately.
 
 SHA256SUMS:
-14fd84fe003d0c53c396578d2351888ad9881ba19d03e1f58baeaaa2e67c8047 system.img
-3772de141b9c7428ca6c7ab02affbd107aadba46fc8f77cdc9a25a7445ccf858 boot.img
-58232f46f3272600e28584db0c392fadd3ac6313348f1643115522c3f9bfad19 recovery.img
+
+c57262809a4707fa1fa69b85652b8bc886e801015f83e3193047d47e0bb76864  system.img
+ed06198e6887e0abbd373eedfc2e6054b62c90b98f54a11297e5a3fd4bfaca08  boot.img
+65e89fc367cbe318a69ed030746870ef5f767fd07165b5b87a71562f582cf634  recovery.img
