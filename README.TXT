@@ -28,3 +28,13 @@ SHA256SUMS:
 c57262809a4707fa1fa69b85652b8bc886e801015f83e3193047d47e0bb76864  system.img
 ed06198e6887e0abbd373eedfc2e6054b62c90b98f54a11297e5a3fd4bfaca08  boot.img
 65e89fc367cbe318a69ed030746870ef5f767fd07165b5b87a71562f582cf634  recovery.img
+
+_________________________________________
+
+To donate to me:
+
+https://www.paypal.com/donate/?hosted_button_id=SZABYRV48SAXW
+
+To donate to the replicant project:
+
+https://crm.fsf.org/civicrm/contribute/transact?reset=1&id=19
