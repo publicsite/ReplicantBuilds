@@ -1,0 +1,10 @@
+--- gcc/config/arm/arm-protos.h.old	2023-03-05 20:28:06.712931358 +0000
++++ gcc/config/arm/arm-protos.h	2023-03-23 23:45:01.237824035 +0000
+@@ -282,6 +282,7 @@
+ 
+ extern void arm_emit_coreregs_64bit_shift (enum rtx_code, rtx, rtx, rtx, rtx,
+ 					   rtx);
++extern bool arm_valid_symbolic_address_p (rtx);
+ extern bool arm_validize_comparison (rtx *, rtx *, rtx *);
+ #endif /* RTX_CODE */
+ 

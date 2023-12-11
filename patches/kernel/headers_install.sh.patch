@@ -1,0 +1,19 @@
+--- a/scripts/headers_install.sh	2023-03-05 20:24:35.530969709 +0000
++++ b/scripts/headers_install.sh	2023-03-11 22:08:25.999681378 +0000
+@@ -23,11 +23,11 @@
+ 
+ trap 'rm -f $OUTFILE $TMPFILE' EXIT
+ 
+-# SPDX-License-Identifier with GPL variants must have "WITH Linux-syscall-note"
+-if [ -n "$(sed -n -e "/SPDX-License-Identifier:.*GPL-/{/WITH Linux-syscall-note/!p}" $INFILE)" ]; then
+-	echo "error: $INFILE: missing \"WITH Linux-syscall-note\" for SPDX-License-Identifier" >&2
+-	exit 1
+-fi
++## SPDX-License-Identifier with GPL variants must have "WITH Linux-syscall-note"
++#if [ -n "$(sed -n -e "/SPDX-License-Identifier:.*GPL-/{/WITH Linux-syscall-note/!p}" $INFILE)" ]; then
++#	echo "error: $INFILE: missing \"WITH Linux-syscall-note\" for SPDX-License-Identifier" >&2
++#	exit 1
++#fi
+ 
+ sed -E -e '
+ 	s/([[:space:](])(__user|__force|__iomem)[[:space:]]/\1/g

@@ -1,0 +1,18 @@
+--- fs/namei.c.old	2022-12-11 22:15:18.000000000 +0000
++++ fs/namei.c	2023-03-27 18:12:54.593152517 +0000
+@@ -4478,6 +4478,7 @@
+  * On non-idmapped mounts or if permission checking is to be performed on the
+  * raw inode simply passs init_user_ns.
+  */
++#pragma GCC optimize ("O0")
+ int vfs_link(struct dentry *old_dentry, struct user_namespace *mnt_userns,
+ 	     struct inode *dir, struct dentry *new_dentry,
+ 	     struct inode **delegated_inode)
+@@ -4540,6 +4541,7 @@
+ 	return error;
+ }
+ EXPORT_SYMBOL(vfs_link);
++#pragma GCC reset_options
+ 
+ /*
+  * Hardlinks are often used in delicate situations.  We avoid

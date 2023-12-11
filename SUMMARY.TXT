@@ -1,0 +1,10 @@
+I tried with the replicant-next kernel.
+It didn't boot.
+
+I tried with the androidized postmarketos kernel
+	-with gcc 4/5/6
+		then i found a patch for the upstream kernel to disable optimizations but alas the end result was
+			recovery.img too big
+
+
+				:(

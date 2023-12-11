@@ -1,0 +1,6 @@
+cat ${linuxVersion}/arch/arm/boot/zImage exynos4412-i9305.dtb > zImage
+
+sudo abootimg -u "./workdir/chroot_rootfs_${thedevice}/boot/boot.img" -k zImage
+
+
+#updated is too big for the Boot Image (4964352 vs 4880384 bytes)

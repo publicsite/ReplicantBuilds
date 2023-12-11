@@ -1,0 +1,14 @@
+--- BoardConfig.mk.old	2023-03-05 20:17:07.778327459 +0000
++++ BoardConfig.mk	2023-04-03 15:32:54.750295592 +0000
+@@ -34,8 +34,10 @@
+ BOARD_GPU_DRIVERS := swrast
+ 
+ # Kernel
+-TARGET_KERNEL_SOURCE := kernel/samsung/smdk4412
++TARGET_KERNEL_SOURCE := kernel/postmarket/linux-postmarketos-exynos4
+ TARGET_KERNEL_CONFIG := lineageos_i9305_defconfig
++BOARD_KERNEL_SEPARATED_DT := true
++BOARD_DTBTOOL_ARGS := -2
+ 
+ # Recovery
+ TARGET_RECOVERY_FSTAB := device/samsung/i9305/rootdir/fstab.smdk4x12

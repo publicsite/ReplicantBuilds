@@ -31,6 +31,15 @@ ed06198e6887e0abbd373eedfc2e6054b62c90b98f54a11297e5a3fd4bfaca08  boot.img
 
 _________________________________________
 
+Hybrid cross between Scintill's fork of replicant 6.0 and (the kernel of) postmarketos - for i9305.
+The script "processKernel.sh" and "getPostmarketConfigs.sh" are used as glue between the postmarket kernel and replicant 6 at the source level.
+"processKernel.sh" patches a vanilla kernel using postmarket patch sets, adapts postmarket mainline kernel configs for use with android (hybridization),
+and updates an android device tree as to use the new kernel, as well as injecting the resulting kernel sources into the replicant source tree; ready to be compiled.
+
+Other updates include updating gcc from 4.9 to 6.5.0 in the toolchain and patching, so that it is able to compile a mainline kernel without error,
+fixing rot due to dead PGP [server] links and outdated [SSL/TLS] certificates during the build, and other minor fixes.
+_________________________________________
+
 To donate to me:
 
 https://www.paypal.com/donate/?hosted_button_id=SZABYRV48SAXW

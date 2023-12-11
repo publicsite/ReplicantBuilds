@@ -1,0 +1,13 @@
+--- gcc/c-family/c.opt.old	2023-03-25 14:21:04.244709871 +0000
++++ gcc/c-family/c.opt	2023-03-25 23:40:43.562849821 +0000
+@@ -836,10 +836,6 @@
+ C ObjC C++ ObjC++ Var(warn_shift_count_overflow) Init(1) Warning
+ Warn if shift count >= width of type.
+ 
+-Wshift-negative-value
+-C ObjC C++ ObjC++ Var(warn_shift_negative_value) Init(-1) Warning
+-Warn if left shifting a negative value.
+-
+ Wsign-compare
+ C ObjC C++ ObjC++ Var(warn_sign_compare) Warning LangEnabledBy(C++ ObjC++,Wall)
+ Warn about signed-unsigned comparisons.

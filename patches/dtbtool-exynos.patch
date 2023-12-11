@@ -1,0 +1,1363 @@
+--- dtbtool.c.old	2023-04-03 18:21:44.608160476 +0000
++++ dtbtool.c	2023-04-03 18:16:21.955149854 +0000
+@@ -1,18 +1,18 @@
+-/*
+- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
++ /*
++ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions are
+  * met:
+-       * Redistributions of source code must retain the above copyright
+-         notice, this list of conditions and the following disclaimer.
+-       * Redistributions in binary form must reproduce the above
+-         copyright notice, this list of conditions and the following
+-         disclaimer in the documentation and/or other materials provided
+-         with the distribution.
+-       * Neither the name of The Linux Foundation nor the names of its
+-         contributors may be used to endorse or promote products derived
+-         from this software without specific prior written permission.
++	   * Redistributions of source code must retain the above copyright
++		 notice, this list of conditions and the following disclaimer.
++	   * Redistributions in binary form must reproduce the above
++		 copyright notice, this list of conditions and the following
++		 disclaimer in the documentation and/or other materials provided
++		 with the distribution.
++	   * Neither the name of The Linux Foundation nor the names of its
++		 contributors may be used to endorse or promote products derived
++		 from this software without specific prior written permission.
+  *
+  * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+@@ -27,1028 +27,392 @@
+  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#define _GNU_SOURCE
+-#include <stdint.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <dirent.h>
+-#include <sys/types.h>
+-#include <sys/stat.h>
++#include <unistd.h>
+ #include <fcntl.h>
+-#include <getopt.h>
+ #include <errno.h>
+-#include <unistd.h>
+-#include <limits.h>
+ 
+-#define QCDT_MAGIC     "QCDT"  /* Master DTB magic */
+-#define QCDT_VERSION   3       /* QCDT version */
+-
+-#define QCDT_DT_TAG    "qcom,msm-id = <"
+-#define QCDT_BOARD_TAG "qcom,board-id = <"
+-#define QCDT_PMIC_TAG  "qcom,pmic-id = <"
++#include <sys/types.h>
++#include <arpa/inet.h>
++#include <assert.h>
++#include <dirent.h>
++#include <err.h>
++#include <stdint.h>
+ 
++#include "libfdt.h"
+ 
+-#define PAGE_SIZE_DEF  2048
+-#define PAGE_SIZE_MAX  (1024*1024)
++/* max amount of scanned dtb files */
++#define DTB_MAX 100
+ 
+-#define log_err(x...)  printf(x)
+-#define log_info(x...) printf(x)
+-#define log_dbg(x...)  { if (verbose) printf(x); }
++/* defaults if not set by args */
++#define DTBH_PAGE_SIZE_DEF	2048
++#define DTBH_PLATFORM_CODE_DEF	0x50a6
++#define DTBH_SUBTYPE_CODE_DEF	0x217584da
+ 
+-#define COPY_BLK       1024    /* File copy block size */
++#define DTBH_MAGIC		"DTBH"
++#define DTBH_VERSION	2
+ 
+-#define RC_SUCCESS     0
+-#define RC_ERROR       -1
++struct dt_blob;
+ 
+-struct chipInfo_t {
+-  uint32_t chipset;
+-  uint32_t platform;
+-  uint32_t subtype;
+-  uint32_t revNum;
+-  uint32_t pmic_model[4];
+-  uint32_t dtb_size;
+-  char     *dtb_file;
+-  struct chipInfo_t *prev;
+-  struct chipInfo_t *next;
+-  struct chipInfo_t *master;
+-  int      wroteDtb;
+-  uint32_t master_offset;
+-  struct chipInfo_t *t_next;
+-};
++/* DTBH_MAGIC + DTBH_VERSION + DTB counts */
++#define DT_HEADER_PHYS_SIZE 12
+ 
+-struct chipInfo_t *chip_list;
++/*
++ * keep the eight uint32_t entries first in this struct so we can memcpy them to the file
++ */
++#define DT_ENTRY_PHYS_SIZE (sizeof(uint32_t) * 8)
++struct dt_entry {
++	uint32_t chip;
++	uint32_t platform;
++	uint32_t subtype;
++	uint32_t hw_rev;
++	uint32_t hw_rev_end;
++	uint32_t offset;
++	uint32_t size; /* including padding */
++	uint32_t space;
+ 
+-struct chipId_t {
+-  uint32_t chipset;
+-  uint32_t revNum;
+-  struct chipId_t *next;
+-  struct chipId_t *t_next;
++	struct dt_blob *blob;
+ };
+ 
+-struct chipSt_t {
+-  uint32_t platform;
+-  uint32_t subtype;
+-  struct chipSt_t *next;
+-  struct chipSt_t *t_next;
+-};
++/*
++ * In memory representation of a dtb blob
++ */
++struct dt_blob {
++	uint32_t size;
++	uint32_t offset;
+ 
+-struct chipPt_t {
+-  uint32_t pmic0;
+-  uint32_t pmic1;
+-  uint32_t pmic2;
+-  uint32_t pmic3;
+-  struct chipPt_t *next;
+-  struct chipPt_t *t_next;
++	void *payload;
++	struct dt_blob *next;
+ };
+ 
+-char *input_dir;
+-char *output_file;
+-char *dtc_path;
+-char *dt_tag = QCDT_DT_TAG;
+-int   verbose;
+-int   page_size = PAGE_SIZE_DEF;
+-int   version_override = 0;
++#define error(fmt, ...) fprintf(stderr, "error: " fmt "\n", ##__VA_ARGS__)
++#define fail(fmt, ...) do { error(fmt,  ##__VA_ARGS__); exit(1); } while (0)
+ 
+-void print_help()
++static void *load_file(const char *fn, unsigned *_sz)
+ {
+-    log_info("dtbTool version %d (kinda :) )\n", QCDT_VERSION);
+-    log_info("dtbTool [options] -o <output file> <input DTB path>\n");
+-    log_info("  options:\n");
+-    log_info("  --output-file/-o     output file\n");
+-    log_info("  --dtc-path/-p        path to dtc\n");
+-    log_info("  --page-size/-s       page size in bytes\n");
+-    log_info("  --dt-tag/-d          alternate QCDT_DT_TAG\n");
+-    log_info("  --verbose/-v         verbose\n");
+-    log_info("  --force-v2/-2        output dtb v2 format\n");
+-    log_info("  --force-v3/-3        output dtb v3 format\n");
+-    log_info("  --help/-h            this help screen\n");
+-}
++	char *data = 0;
++	int sz;
++	int fd;
+ 
+-int parse_commandline(int argc, char *const argv[])
+-{
+-    int c;
++	fd = open(fn, O_RDONLY);
++	if (fd < 0) return 0;
+ 
+-    struct option long_options[] = {
+-        {"output-file", 1, 0, 'o'},
+-        {"dtc-path",    1, 0, 'p'},
+-        {"page-size",   1, 0, 's'},
+-        {"dt-tag",      1, 0, 'd'},
+-        {"force-v2",    0, 0, '2'},
+-        {"force-v3",    0, 0, '3'},
+-        {"verbose",     0, 0, 'v'},
+-        {"help",        0, 0, 'h'},
+-        {0, 0, 0, 0}
+-    };
++	sz = lseek(fd, 0, SEEK_END);
++	if (sz < 0) goto oops;
+ 
+-    while ((c = getopt_long(argc, argv, "-o:p:s:d:23vh", long_options, NULL))
+-           != -1) {
+-        switch (c) {
+-        case 1:
+-            if (!input_dir)
+-                input_dir = optarg;
+-            break;
+-        case 'o':
+-            output_file = optarg;
+-            break;
+-        case 'p':
+-            dtc_path = optarg;
+-            break;
+-        case 's':
+-            page_size = atoi(optarg);
+-            if ((page_size <= 0) || (page_size > (PAGE_SIZE_MAX))) {
+-                log_err("Invalid page size (> 0 and <=1MB\n");
+-                return RC_ERROR;
+-            }
+-            break;
+-        case 'd':
+-            dt_tag = optarg;
+-            break;
+-        case '2':
+-        case '3':
+-            if (version_override != 0) {
+-                log_err("A version output argument may only be passed once\n");
+-                return RC_ERROR;
+-            }
+-            version_override = c - '0';
+-            break;
+-        case 'v':
+-            verbose = 1;
+-            break;
+-        case 'h':
+-        default:
+-            return RC_ERROR;
+-        }
+-    }
++	if (lseek(fd, 0, SEEK_SET)) goto oops;
+ 
+-    if (!output_file) {
+-        log_err("Output file must be specified\n");
+-        return RC_ERROR;
+-    }
++	data = malloc(sz);
++	if (!data) goto oops;
+ 
+-    if (!input_dir)
+-        input_dir = "./";
++	if (read(fd, data, sz) != sz) goto oops;
++	close(fd);
+ 
+-    if (!dtc_path)
+-        dtc_path = "";
++	*_sz = sz;
++	return data;
+ 
+-    return RC_SUCCESS;
++oops:
++	close(fd);
++	if (data) free(data);
++	return 0;
+ }
+ 
+-/* Unique entry sorted list add (by chipset->platform->rev) */
+-int chip_add(struct chipInfo_t *c)
++static void *scan_dtb_path(char **dtb_files, const char *dtb_path)
+ {
+-    struct chipInfo_t *x = chip_list;
++	struct dirent **de;
++	int i, f, files, namlen;
++	const int dlen = strlen(dtb_path);
+ 
+-    if (!chip_list) {
+-        chip_list = c;
+-        c->next = NULL;
+-        c->prev = NULL;
+-        return RC_SUCCESS;
+-    }
++	files = scandir(dtb_path, &de, NULL, alphasort);
++	if (files < 0)
++		error("failed to open '%s': %s", dtb_path, strerror(errno));
+ 
+-    while (1) {
+-        if ((c->chipset < x->chipset) ||
+-            ((c->chipset == x->chipset) &&
+-             ((c->platform < x->platform) ||
+-              ((c->platform == x->platform) &&
+-               ((c->subtype < x->subtype) ||
+-                ((c->subtype == x->subtype) &&
+-                 (c->revNum < x->revNum))))))) {
+-            if (!x->prev) {
+-                c->next = x;
+-                c->prev = NULL;
+-                x->prev = c;
+-                chip_list = c;
+-                break;
+-            } else {
+-                c->next = x;
+-                c->prev = x->prev;
+-                x->prev->next = c;
+-                x->prev = c;
+-                break;
+-            }
+-        }
+-        if ((c->chipset == x->chipset) &&
+-            (c->platform == x->platform) &&
+-            (c->subtype == x->subtype) &&
+-            (c->revNum == x->revNum) &&
+-            (c->pmic_model[0] == x->pmic_model[0]) &&
+-            (c->pmic_model[1] == x->pmic_model[1]) &&
+-            (c->pmic_model[2] == x->pmic_model[2]) &&
+-            (c->pmic_model[3] == x->pmic_model[3])) {
+-            return RC_ERROR;  /* duplicate */
+-        }
+-        if (!x->next) {
+-            c->prev = x;
+-            c->next = NULL;
+-            x->next = c;
+-            break;
+-        }
+-        x = x->next;
+-    }
+-    return RC_SUCCESS;
+-}
++	for (f = 0, i = 0; f < files; f++) {
++		namlen = strlen(de[f]->d_name);
++		if (namlen < 4 || strcmp(&de[f]->d_name[namlen - 4], ".dtb"))
++			goto next_f;
+ 
+-void chip_deleteall()
+-{
+-    struct chipInfo_t *c = chip_list, *t;
++		/* skip over already allocated file names */
++		for (; dtb_files[i]; i++)
++			if (i >= DTB_MAX)
++				fail("reached dtb file limit (%d)", DTB_MAX);
+ 
+-    while (c) {
+-        t = c;
+-        c = c->next;
+-        if (t->dtb_file)
+-            free(t->dtb_file);
+-        free(t);
+-    }
+-}
++		namlen += dlen + 2; /* / and NULL terminator */
++		dtb_files[i] = calloc(namlen, sizeof(char));
++		if (!dtb_files[i])
++			fail("failed to allocate memory");
+ 
+-/*
+-  For v1 Extract 'qcom,msm-id' parameter triplet from DTB
+-      qcom,msm-id = <x y z>;
++		snprintf(dtb_files[i], namlen, "%s/%s", dtb_path, de[f]->d_name);
++next_f:
++		free(de[f]);
++	}
+ 
+-  For v2 Extract 'qcom,msm-id', 'qcom,board-id' parameter double from DTB
+-      qcom,msm-id = <x z> i.e chipset, revision number;
+-      qcom,board-id = <y y'> i.e platform and sub-type;
+- */
++	return 0;
++}
+ 
+-struct chipInfo_t *getChipInfo(const char *filename, int *num, uint32_t msmversion)
++static void *load_dtbh_block(char **dtb_files, unsigned pagesize,
++			     uint32_t platform_code, uint32_t subtype_code,
++			     unsigned *_sz)
+ {
++	const unsigned pagemask = pagesize - 1;
++	struct dt_entry *new_entries;
++	struct dt_entry *entries = NULL;
++	struct dt_entry *entry;
++	struct dt_blob *blob;
++	struct dt_blob *blob_list = NULL;
++	struct dt_blob *last_blob = NULL;
++	unsigned new_count;
++	unsigned entry_count = 0;
++	unsigned offset;
++	unsigned dtb_sz = 0;
++	unsigned hdr_sz = DT_HEADER_PHYS_SIZE;
++	uint32_t version = DTBH_VERSION;
++	unsigned blob_sz = 0;
++	const unsigned *prop_chip;
++	const unsigned *prop_hw_rev;
++	const unsigned *prop_hw_rev_end;
++	const unsigned *prop_compatible;
++	int len;
++	void *dtb;
++	char *dtbh;
++	char **fname;
++	unsigned c;
+ 
+-    const char str1[] = "dtc -I dtb -O dts \"";
+-    const char str2[] = "\" 2>&1";
+-    char *buf, *pos;
+-    char *line = NULL;
+-    size_t line_size;
+-    FILE *pfile;
+-    int llen;
+-    struct chipInfo_t *chip = NULL, *tmp, *chip_t;
+-    uint32_t data[3] = {0, 0, 0};
+-    uint32_t data_st[2] = {0, 0};
+-    uint32_t data_pt[4] = {0, 0, 0, 0};
+-    char *tok, *sptr = NULL;
+-    int i, entryValid, entryEnded;
+-    int count = 0, count1 = 0, count2 = 0, count3 = 0;
+-    int entryValidST, entryEndedST, entryValidDT, entryEndedDT, entryValidPT, entryEndedPT;
+-    struct chipId_t *chipId = NULL, *cId = NULL, *tmp_id = NULL;
+-    struct chipSt_t *chipSt = NULL, *cSt = NULL, *tmp_st = NULL;
+-    struct chipPt_t *chipPt = NULL, *cPt = NULL, *tmp_pt = NULL;
+-    struct chipId_t *chipId_tmp = NULL;
+-    struct chipSt_t *chipSt_tmp = NULL;
+-    struct chipPt_t *chipPt_tmp = NULL;
+-
+-    line_size = 1024;
+-    line = (char *)malloc(line_size);
+-    if (!line) {
+-        log_err("Out of memory\n");
+-        return NULL;
+-    }
+-
+-    llen = sizeof(char) * (strlen(dtc_path) +
+-                           strlen(str1) +
+-                           strlen(str2) +
+-                           strlen(filename) + 1);
+-    buf = (char *)malloc(llen);
+-    if (!buf) {
+-        log_err("Out of memory\n");
+-        free(line);
+-        return NULL;
+-    }
+-
+-    strncpy(buf, dtc_path, llen);
+-    strncat(buf, str1, llen);
+-    strncat(buf, filename, llen);
+-    strncat(buf, str2, llen);
+-
+-    pfile = popen(buf, "r");
+-    free(buf);
+-
+-    if (pfile == NULL) {
+-        log_err("... skip, fail to decompile dtb\n");
+-    } else {
+-        /* Find "qcom,msm-id" */
+-        while ((llen = getline(&line, &line_size, pfile)) != -1) {
+-            if (msmversion == 1) {
+-                if ((pos = strstr(line, dt_tag)) != NULL) {
+-                    pos += strlen(dt_tag);
++	for (fname = dtb_files; *fname; fname++) {
++		dtb = load_file(*fname, &dtb_sz);
++		if (!dtb || !dtb_sz)
++			error("failed to read dtb '%s'", *fname);
+ 
+-                    entryEnded = 0;
+-                    while (1) {
+-                        entryValid = 1;
+-                        for (i = 0; i < 3; i++) {
+-                            tok = strtok_r(pos, " \t", &sptr);
+-                            pos = NULL;
+-                            if (tok != NULL) {
+-                                if (*tok == '>') {
+-                                    entryEnded = 1;
+-                                    entryValid = 0;
+-                                    break;
+-                                }
+-                                data[i] = strtoul(tok, NULL, 0);
+-                            } else {
+-                                data[i] = 0;
+-                                entryValid = 0;
+-                                entryEnded = 1;
+-                            }
+-                        }
+-                        if (entryEnded) {
+-                            free(line);
+-                            pclose(pfile);
+-                            *num = count;
+-                            return chip;
+-                        }
+-                        if (entryValid) {
+-                            tmp = (struct chipInfo_t *)
+-                                      malloc(sizeof(struct chipInfo_t));
+-                            if (!tmp) {
+-                                log_err("Out of memory\n");
+-                                break;
+-                            }
+-                            if (!chip) {
+-                                chip = tmp;
+-                                chip->t_next = NULL;
+-                            } else {
+-                                tmp->t_next = chip->t_next;
+-                                chip->t_next = tmp;
+-                            }
+-                            tmp->chipset  = data[0];
+-                            tmp->platform = data[1];
+-                            tmp->subtype  = 0;
+-                            tmp->revNum   = data[2];
+-                            tmp->pmic_model[0] = 0;
+-                            tmp->pmic_model[1] = 0;
+-                            tmp->pmic_model[2] = 0;
+-                            tmp->pmic_model[3] = 0;
+-                            tmp->dtb_size = 0;
+-                            tmp->dtb_file = NULL;
+-                            tmp->master   = chip;
+-                            tmp->wroteDtb = 0;
+-                            tmp->master_offset = 0;
+-                            count++;
+-                        }
+-                    }
++		if (fdt_check_header(dtb) != 0) {
++			warnx("'%s' is not a valid dtb, skipping", *fname);
++			free(dtb);
++			continue;
++		}
+ 
+-                    log_err("... skip, incorrect '%s' format\n", dt_tag);
+-                    break;
+-                }
+-            } else if (msmversion == 2 || msmversion == 3) {
+-                if ((pos = strstr(line, dt_tag)) != NULL) {
+-                    pos += strlen(dt_tag);
++		offset = fdt_path_offset(dtb, "/");
+ 
+-                    entryEndedDT = 0;
+-                    for (;entryEndedDT < 1;) {
+-                        entryValidDT = 1;
+-                        for (i = 0; i < 2; i++) {
+-                            tok = strtok_r(pos, " \t", &sptr);
+-                            pos = NULL;
+-                            if (tok != NULL) {
+-                                if (*tok == '>') {
+-                                    entryEndedDT = 1;
+-                                    entryValidDT = 0;
+-                                    break;
+-                                }
+-                                data_st[i] = strtoul(tok, NULL, 0);
+-                            } else {
+-                                data_st[i] = 0;
+-                                entryValidDT = 0;
+-                                entryEndedDT = 1;
+-                            }
+-                        }
++		prop_chip = fdt_getprop(dtb, offset, "model_info-chip", &len);
++		if (len % (sizeof(uint32_t))) {
++			warnx("model_info-chip of %s is of invalid size, skipping", *fname);
++			free(dtb);
++			continue;
++		}
+ 
+-                        if (entryValidDT) {
+-                            tmp_id = (struct chipId_t *)
+-                                         malloc(sizeof(struct chipId_t));
+-                            if (!tmp_id) {
+-                                log_err("Out of memory\n");
+-                                break;
+-                            }
+-                            if (!chipId) {
+-                                chipId = tmp_id;
+-                                cId = tmp_id;
+-                                chipId->t_next = NULL;
+-                            } else {
+-                                tmp_id->t_next = chipId->t_next;
+-                                chipId->t_next = tmp_id;
+-                            }
+-                            tmp_id->chipset = data_st[0];
+-                            tmp_id->revNum= data_st[1];
+-                            count1++;
+-                        }
+-                    }
+-                }
++		prop_hw_rev = fdt_getprop(dtb, offset, "model_info-hw_rev", &len);
++		if (len % (sizeof(uint32_t))) {
++			warnx("model_info-hw_rev of %s is of invalid size, skipping", *fname);
++			free(dtb);
++			continue;
++		}
+ 
+-                if ((pos = strstr(line,QCDT_BOARD_TAG)) != NULL) {
+-                    pos += strlen(QCDT_BOARD_TAG);
+-                    entryEndedST = 0;
+-                    for (;entryEndedST < 1;) {
+-                        entryValidST = 1;
+-                        for (i = 0; i < 2; i++) {
+-                            tok = strtok_r(pos, " \t", &sptr);
+-                            pos = NULL;
+-                            if (tok != NULL) {
+-                                if (*tok == '>') {
+-                                    entryEndedST = 1;
+-                                    entryValidST = 0;
+-                                    break;
+-                                }
+-                                data_st[i] = strtoul(tok, NULL, 0);
+-                            } else {
+-                                data_st[i] = 0;
+-                                entryValidST = 0;
+-                                entryEndedST = 1;
+-                            }
+-                        }
+-                        if (entryValidST) {
+-                            tmp_st = (struct chipSt_t *)
+-                                       malloc(sizeof(struct chipSt_t));
+-                            if (!tmp_st) {
+-                                log_err("Out of memory\n");
+-                                break;
+-                            }
++		prop_hw_rev_end = fdt_getprop(dtb, offset, "model_info-hw_rev_end", &len);
++		if (len % (sizeof(uint32_t))) {
++			warnx("model_info-hw_rev_end of %s is of invalid size, skipping", *fname);
++			free(dtb);
++			continue;
++		}
+ 
+-                            if (!chipSt) {
+-                                chipSt = tmp_st;
+-                                cSt = tmp_st;
+-                                chipSt->t_next = NULL;
+-                            } else {
+-                                tmp_st->t_next = chipSt->t_next;
+-                                chipSt->t_next = tmp_st;
+-                            }
++		prop_compatible = fdt_getprop(dtb, offset, "compatible", 0);
++		if (!prop_compatible) {
++			warnx("compatible field of %s is missing, skipping", *fname);
++			free(dtb);
++			continue;
++		}
+ 
+-                            tmp_st->platform = data_st[0];
+-                            tmp_st->subtype= data_st[1];
+-                            count2++;
+-                        }
+-                    }
+-                }
++		printf("=> Found compatible entry: %s\n"
++			  "    (chip: %u, hw_rev: %u, hw_rev_end: %u)\n",
++				(char *)&prop_compatible[0], ntohl(prop_chip[0]),
++				ntohl(prop_hw_rev[0]), ntohl(prop_hw_rev_end[0]));
+ 
+-                if ((pos = strstr(line,QCDT_PMIC_TAG)) != NULL) {
+-                    pos += strlen(QCDT_PMIC_TAG);
+-                    entryEndedPT = 0;
+-                    for (;entryEndedPT < 1;) {
+-                        entryValidPT = 1;
+-                        for (i = 0; i < 4; i++) {
+-                            tok = strtok_r(pos, " \t", &sptr);
+-                            pos = NULL;
+-                            if (tok != NULL) {
+-                                if (*tok == '>') {
+-                                    entryEndedPT = 1;
+-                                    entryValidPT = 0;
+-                                    break;
+-                                }
+-                                data_pt[i] = strtoul(tok, NULL, 0);
+-                            } else {
+-                                data_pt[i] = 0;
+-                                entryValidPT = 0;
+-                                entryEndedPT = 1;
+-                            }
+-                        }
+-                        if (entryValidPT) {
+-                            tmp_pt = (struct chipPt_t *)
+-                                       malloc(sizeof(struct chipPt_t));
+-                            if (!tmp_pt) {
+-                                log_err("Out of memory\n");
+-                                break;
+-                            }
++		blob = calloc(1, sizeof(struct dt_blob));
++		if (!blob)
++			error("failed to allocate memory");
+ 
+-                            if (!chipPt) {
+-                                chipPt = tmp_pt;
+-                                cPt = tmp_pt;
+-                                chipPt->t_next = NULL;
+-                            } else {
+-                                tmp_pt->t_next = chipPt->t_next;
+-                                chipPt->t_next = tmp_pt;
+-                            }
++		blob->payload = dtb;
++		blob->size = dtb_sz;
++		if (!blob_list) {
++			blob_list = blob;
++			last_blob = blob;
++		} else {
++			last_blob->next = blob;
++			last_blob = blob;
++		}
+ 
+-                            tmp_pt->pmic0 = data_pt[0];
+-                            tmp_pt->pmic1 = data_pt[1];
+-                            tmp_pt->pmic2 = data_pt[2];
+-                            tmp_pt->pmic3 = data_pt[3];
+-                            count3++;
+-                        }
+-                    }
+-                }
+-            }
+-        }
+-    }
++		blob_sz += (blob->size + pagemask) & ~pagemask;
++		new_count = entry_count + 1;
++		new_entries = realloc(entries, new_count * sizeof(struct dt_entry));
++		if (!new_entries)
++			error("failed to allocate memory");
+ 
+-    if (line)
+-        free(line);
++		entries = new_entries;
++		entry = &entries[entry_count];
++		memset(entry, 0, sizeof(*entry));
++		entry->chip = ntohl(prop_chip[0]);
++		entry->platform = platform_code;
++		entry->subtype = subtype_code;
++		entry->hw_rev = ntohl(prop_hw_rev[0]);
++		entry->hw_rev_end = ntohl(prop_hw_rev_end[0]);
++		entry->space = 0x20; /* space delimiter */
++		entry->blob = blob;
+ 
+-    if (count1 == 0) {
+-        log_err("... skip, incorrect '%s' format\n", dt_tag);
+-        return NULL;
+-    }
+-    if (count2 == 0) {
+-        log_err("... skip, incorrect '%s' format\n", QCDT_BOARD_TAG);
+-        return NULL;
+-    }
+-    if (count3 == 0 && msmversion == 3) {
+-        log_err("... skip, incorrect '%s' format\n", QCDT_PMIC_TAG);
+-        return NULL;
+-    }
++		entry_count++;
+ 
+-    tmp_st = cSt;
+-    tmp_pt = cPt;
+-    while (cId != NULL) {
+-        while (cSt != NULL) {
+-            if (msmversion == 3) {
+-                while (cPt != NULL) {
+-                    tmp = (struct chipInfo_t *)
+-                        malloc(sizeof(struct chipInfo_t));
+-                    if (!tmp) {
+-                        log_err("Out of memory\n");
+-                        break;
+-                    }
+-                    if (!chip) {
+-                        chip = tmp;
+-                        chip->t_next = NULL;
+-                    } else {
+-                        tmp->t_next = chip->t_next;
+-                        chip->t_next = tmp;
+-                    }
++		hdr_sz += entry_count * DT_ENTRY_PHYS_SIZE;
++	}
+ 
+-                    tmp->chipset  = cId->chipset;
+-                    tmp->platform = cSt->platform;
+-                    tmp->revNum   = cId->revNum;
+-                    tmp->subtype  = cSt->subtype;
+-                    tmp->pmic_model[0] = cPt->pmic0;
+-                    tmp->pmic_model[1] = cPt->pmic1;
+-                    tmp->pmic_model[2] = cPt->pmic2;
+-                    tmp->pmic_model[3] = cPt->pmic3;
+-                    tmp->dtb_size = 0;
+-                    tmp->dtb_file = NULL;
+-                    tmp->master   = chip;
+-                    tmp->wroteDtb = 0;
+-                    tmp->master_offset = 0;
+-                    cPt = cPt->t_next;
+-                }
+-                cPt = tmp_pt;
+-            } else {
+-                tmp = (struct chipInfo_t *)
+-                    malloc(sizeof(struct chipInfo_t));
+-                if (!tmp) {
+-                    log_err("Out of memory\n");
+-                    break;
+-                }
+-                if (!chip) {
+-                    chip = tmp;
+-                    chip->t_next = NULL;
+-                } else {
+-                    tmp->t_next = chip->t_next;
+-                    chip->t_next = tmp;
+-                }
+-                tmp->chipset  = cId->chipset;
+-                tmp->platform = cSt->platform;
+-                tmp->revNum   = cId->revNum;
+-                tmp->subtype  = cSt->subtype;
+-                tmp->pmic_model[0] = 0;
+-                tmp->pmic_model[1] = 0;
+-                tmp->pmic_model[2] = 0;
+-                tmp->pmic_model[3] = 0;
+-                tmp->dtb_size = 0;
+-                tmp->dtb_file = NULL;
+-                tmp->master   = chip;
+-                tmp->wroteDtb = 0;
+-                tmp->master_offset = 0;
+-            }
+-            cSt = cSt->t_next;
+-        }
+-        cSt = tmp_st;
+-        cId = cId->t_next;
+-    }
++	if (!entry_count) {
++		warnx("unable to locate any dtbs in the given path");
++		return 0;
++	}
+ 
+-    if (msmversion == 2)
+-        entryEndedPT = 1;
++	hdr_sz += sizeof(uint32_t); /* eot marker */
++	hdr_sz = (hdr_sz + pagemask) & ~pagemask;
+ 
+-    /* clear memory*/
+-    pclose(pfile);
+-    while (chipId) {
+-        chipId_tmp = chipId;
+-        chipId = chipId->t_next;
+-        free(chipId_tmp);
+-    }
+-    while (chipSt) {
+-        chipSt_tmp= chipSt;
+-        chipSt = chipSt->t_next;
+-        free(chipSt_tmp);
+-    }
++	/* The size of the dt header is now known, calculate the blob offsets... */
++	offset = hdr_sz;
++	for (blob = blob_list; blob; blob = blob->next) {
++		blob->offset = offset;
++		offset += (blob->size + pagemask) & ~pagemask;
++	}
+ 
+-    while (chipPt) {
+-        chipPt_tmp= chipPt;
+-        chipPt = chipPt->t_next;
+-        free(chipPt_tmp);
+-    }
++	/* ...and update the entries */
++	for (c = 0; c < entry_count; c++) {
++		entry = &entries[c];
+ 
+-    if (entryEndedST  == 1 && entryEndedDT == 1 && entryEndedPT == 1) {
+-        *num = count1;
+-        return chip;
+-    }
++		entry->offset = entry->blob->offset;
++		entry->size = (entry->blob->size + pagemask) & ~pagemask;
++	}
+ 
+-    /* clear memory*/
+-    while (chip) {
+-        chip_t = chip;
+-        chip = chip->next;
+-        if (chip_t->dtb_file)
+-            free(chip_t->dtb_file);
+-        free(chip_t);
+-    }
+-    return NULL;
+-}
++	/*
++	 * All parts are now gathered, so build the dt block
++	 */
++	dtbh = calloc(hdr_sz + blob_sz, 1);
++	if (!dtbh)
++		fail("failed to allocate memory");
+ 
+-/* Get the version-id based on dtb files */
+-uint32_t GetVersionInfo(const char *filename)
+-{
+-    const char str1[] = "dtc -I dtb -O dts \"";
+-    const char str2[] = "\" 2>&1";
+-    char *buf, *pos;
+-    char *line = NULL;
+-    size_t line_size;
+-    FILE *pfile;
+-    int llen;
+-    uint32_t v = 1;
++	offset = 0;
+ 
+-    line_size = 1024;
+-    line = (char *)malloc(line_size);
+-    if (!line) {
+-        log_err("Out of memory\n");
+-        return 0;
+-    }
++	memcpy(dtbh, DTBH_MAGIC, sizeof(uint32_t));
++	memcpy(dtbh + sizeof(uint32_t), &version, sizeof(uint32_t));
++	memcpy(dtbh + (sizeof(uint32_t) * 2), &entry_count, sizeof(uint32_t));
+ 
+-    llen = sizeof(char) * (strlen(dtc_path) +
+-                           strlen(str1) +
+-                           strlen(str2) +
+-                           strlen(filename) + 1);
+-    buf = (char *)malloc(llen);
+-    if (!buf) {
+-        log_err("Out of memory\n");
+-        free(line);
+-        return 0;
+-    }
++	offset += DT_HEADER_PHYS_SIZE;
+ 
+-    strncpy(buf, dtc_path, llen);
+-    strncat(buf, str1, llen);
+-    strncat(buf, filename, llen);
+-    strncat(buf, str2, llen);
++	/* add dtbh entries */
++	for (c = 0; c < entry_count; c++) {
++		entry = &entries[c];
++		memcpy(dtbh + offset, entry, DT_ENTRY_PHYS_SIZE);
++		offset += DT_ENTRY_PHYS_SIZE;
++	}
+ 
+-    pfile = popen(buf, "r");
+-    free(buf);
++	/* add padding after dt header */
++	offset += pagesize - (offset & pagemask);
+ 
+-    if (pfile == NULL) {
+-        log_err("... skip, fail to decompile dtb\n");
+-    } else {
+-        /* Find the type of version */
+-        while ((llen = getline(&line, &line_size, pfile)) != -1) {
+-            if ((pos = strstr(line,QCDT_BOARD_TAG)) != NULL) {
+-                v = 2;
+-            }
+-            if ((pos = strstr(line,QCDT_PMIC_TAG)) != NULL) {
+-                v = 3;
+-                break;
+-            }
+-        }
+-    }
++	for (blob = blob_list; blob; blob = blob->next) {
++		memcpy(dtbh + offset, blob->payload, blob->size);
++		offset += (blob->size + pagemask) & ~pagemask;
++	}
+ 
+-    free(line);
+-    log_info("Version:%d\n", v);
++	*_sz = hdr_sz + blob_sz;
+ 
+-    return v;
++	return dtbh;
+ }
+ 
+-static int find_dtb(const char *path, uint32_t *version)
++static int usage(void)
+ {
+-    struct dirent *dp;
+-    int flen;
+-    char *filename;
+-    struct chipInfo_t *chip, *t_chip;
+-    struct stat st;
+-    int num;
+-    int rc = RC_SUCCESS;
+-    uint32_t msmversion = 0;
+-    int dtb_count = 0;
+-
+-    DIR *dir = opendir(path);
+-    if (!dir) {
+-        log_err("Failed to open input directory '%s'\n", path);
+-        return RC_ERROR;
+-    }
+-
+-    /* Open the .dtb files in the specified path, decompile and
+-       extract "qcom,msm-id" parameter
+-     */
+-    while ((dp = readdir(dir)) != NULL) {
+-        if (dp->d_type == DT_UNKNOWN) {
+-            struct stat statbuf;
+-            char name[PATH_MAX];
+-            snprintf(name, sizeof(name), "%s%s%s",
+-                     path,
+-                     (path[strlen(path) - 1] == '/' ? "" : "/"),
+-                     dp->d_name);
+-            if (!stat(name, &statbuf)) {
+-                if (S_ISREG(statbuf.st_mode)) {
+-                    dp->d_type = DT_REG;
+-                } else if (S_ISDIR(statbuf.st_mode)) {
+-                    dp->d_type = DT_DIR;
+-                }
+-            }
+-        }
+-
+-        if (dp->d_type == DT_DIR) {
+-            char name[PATH_MAX];
+-            if (dp->d_name[0] == '.') {
+-                continue;
+-            }
+-            snprintf(name, sizeof(name), "%s%s%s%s",
+-                     path,
+-                     (path[strlen(path) - 1] == '/' ? "" : "/"),
+-                     dp->d_name,
+-                     "/");
+-            log_info("Searching subdir: %s ... \n", name);
+-            dtb_count += find_dtb(name, version);
+-        } else if (dp->d_type == DT_REG) {
+-            flen = strlen(dp->d_name);
+-            if ((flen > 4) &&
+-                (strncmp(&dp->d_name[flen-4], ".dtb", 4) == 0)) {
+-                log_info("Found file: %s ... \n", dp->d_name);
+-
+-                flen = strlen(path) + strlen(dp->d_name) + 1;
+-                filename = (char *)malloc(flen);
+-                if (!filename) {
+-                    log_err("Out of memory\n");
+-                    rc = RC_ERROR;
+-                    break;
+-                }
+-                strncpy(filename, path, flen);
+-                strncat(filename, dp->d_name, flen);
+-
+-                /* To identify the version number */
+-                msmversion = GetVersionInfo(filename);
+-                if (*version < msmversion) {
+-                    *version = msmversion;
+-                }
+-
+-                num = 1;
+-                chip = getChipInfo(filename, &num, msmversion);
+-
+-                if (msmversion == 1) {
+-                    if (!chip) {
+-                        log_err("skip, failed to scan for '%s' tag\n", dt_tag);
+-                        free(filename);
+-                        continue;
+-                    }
+-                }
+-                if (msmversion == 2) {
+-                    if (!chip) {
+-                        log_err("skip, failed to scan for '%s' or '%s' tag\n",
+-                                dt_tag, QCDT_BOARD_TAG);
+-                        free(filename);
+-                        continue;
+-                    }
+-                }
+-                if (msmversion == 3) {
+-                    if (!chip) {
+-                        log_err("skip, failed to scan for '%s', '%s' or '%s' tag\n",
+-                                dt_tag, QCDT_BOARD_TAG, QCDT_PMIC_TAG);
+-                        free(filename);
+-                        continue;
+-                    }
+-                }
+-
+-                if ((stat(filename, &st) != 0) ||
+-                    (st.st_size == 0)) {
+-                    log_err("skip, failed to get DTB size\n");
+-                    free(filename);
+-                    continue;
+-                }
+-
+-                log_info("chipset: %u, rev: %u, platform: %u, subtype: %u, pmic0: %u, pmic1: %u, pmic2: %u, pmic3: %u\n",
+-                         chip->chipset, chip->revNum, chip->platform, chip->subtype,
+-                         chip->pmic_model[0], chip->pmic_model[1], chip->pmic_model[2], chip->pmic_model[3]);
+-
+-                for (t_chip = chip->t_next; t_chip; t_chip = t_chip->t_next) {
+-                    log_info("additional chipset: %u, rev: %u, platform: %u, subtype: %u, pmic0: %u, pmic1: %u, pmic2: %u, pmic3: %u\n",
+-                             t_chip->chipset, t_chip->revNum, t_chip->platform, t_chip->subtype,
+-                             t_chip->pmic_model[0], t_chip->pmic_model[1], t_chip->pmic_model[2], t_chip->pmic_model[3]);
+-                }
+-
+-                rc = chip_add(chip);
+-                if (rc != RC_SUCCESS) {
+-                    log_err("... duplicate info, skipped\n");
+-                    free(filename);
+-                    continue;
+-                }
+-
+-                dtb_count++;
+-
+-                chip->dtb_size = st.st_size +
+-                                   (page_size - (st.st_size % page_size));
+-                chip->dtb_file = filename;
+-
+-                for (t_chip = chip->t_next; t_chip; t_chip = t_chip->t_next) {
+-                    rc = chip_add(t_chip);
+-                    if (rc != RC_SUCCESS) {
+-                        log_err("... duplicate info, skipped (chipset %u, rev: %u, platform: %u, subtype: %u\n",
+-                             t_chip->chipset, t_chip->revNum, t_chip->platform, t_chip->subtype);
+-                        continue;
+-                    }
+-                    dtb_count++;
+-                }
+-            }
+-        }
+-    }
+-    closedir(dir);
+-    return dtb_count;
++	fprintf(stderr, "usage: dtbtool\n"
++			"      -o|--output <filename>\n"
++			"      [ -s|--pagesize <pagesize> ]\n"
++			"      [ --platform <hex platform code> ]\n"
++			"      [ --subtype <hex subtype code> ]\n"
++			"      [ -d|--dtb <dtb path> ]...\n"
++			"      [ <dtb file> ]...\n"
++			);
++	exit(1);
+ }
+ 
+-/* Extract 'qcom,msm-id' 'qcom,board-id' parameter from DTB
+-   v1 format:
+-      qcom,msm-id = <x y z> [, <x2 y2 z2> ...];
+-   v2 format:
+-      qcom,msm-id = <x z> [, <x2 z2> ...;
+-      qcom,board-id = <y y'> [, <y2 y2'> ...;
+-   Fields:
+-      x  = chipset
+-      y  = platform
+-      y' = subtype
+-      z  = soc rev
+- */
++#define read_val { if (argc < 2) return usage(); val = argv[1]; argc--; argv++; }
++
+ int main(int argc, char **argv)
+ {
+-    char buf[COPY_BLK];
+-    struct chipInfo_t *chip;
+-    FILE *pInputFile;
+-    int padding;
+-    uint8_t *filler = NULL;
+-    int numBytesRead = 0;
+-    int totBytesRead = 0;
+-    int out_fd;
+-    int rc = RC_SUCCESS;
+-    int dtb_count = 0, dtb_offset = 0, entry_size;
+-    size_t wrote = 0, expected = 0;
+-    uint32_t dtb_size;
+-    uint32_t version = 0;
+-    char *filename;
+-
+-    log_info("DTB combiner:\n");
+-
+-    if (parse_commandline(argc, argv) != RC_SUCCESS) {
+-        print_help();
+-        return RC_ERROR;
+-    }
+-
+-    log_info("  Input directory: '%s'\n", input_dir);
+-    log_info("  Output file: '%s'\n", output_file);
+-
+-
+-    filler = (uint8_t *)malloc(page_size);
+-    if (!filler) {
+-        log_err("Out of memory\n");
+-        return RC_ERROR;
+-    }
+-    memset(filler, 0, page_size);
+-
+-    dtb_count = find_dtb(input_dir, &version);
+-
+-    log_info("=> Found %d unique DTB(s)\n", dtb_count);
+-
+-    if (!dtb_count)
+-        goto cleanup;
+-
+-
+-    /* Generate the master DTB file:
+-
+-       Simplify write error handling by just checking for actual vs
+-       expected bytes written at the end.
+-     */
+-
+-    log_info("\nGenerating master DTB... ");
+-
+-    out_fd = open(output_file, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+-    if (out_fd == -1) {
+-        log_err("Cannot create '%s'\n", output_file);
+-        rc = RC_ERROR;
+-        goto cleanup;
+-    }
+-
+-    if (version_override != 0) {
+-        version = version_override;
+-    }
++	char *arg, *val;
++	char *dt_img = 0;
++	void *dt_data = 0;
++	char **dtb_files = 0;
++	int fd, dt_count = 0;
++	unsigned pagesize = DTBH_PAGE_SIZE_DEF;
++	uint32_t dt_platform_code = DTBH_PLATFORM_CODE_DEF;
++	uint32_t dt_subtype_code = DTBH_SUBTYPE_CODE_DEF;
++	unsigned dt_size;
+ 
+-    if (version == 1) {
+-        entry_size = 20;
+-    } else if (version == 2) {
+-        entry_size = 24;
+-    } else {
+-        entry_size = 40;
+-    }
++	dtb_files = malloc(sizeof(char*) * DTB_MAX);
++	if (!dtb_files)
++		error("failed to allocate memory");
+ 
+-    /* Write header info */
+-    wrote += write(out_fd, QCDT_MAGIC, sizeof(uint8_t) * 4); /* magic */
+-    wrote += write(out_fd, &version, sizeof(uint32_t));      /* version */
+-    wrote += write(out_fd, (uint32_t *)&dtb_count, sizeof(uint32_t));
+-                                                             /* #DTB */
++	while (argc > 0) {
++		argc--;
++		argv++;
++		if (argc < 1)
++			break;
++		arg = argv[0];
++		val = 0;
+ 
+-    /* Calculate offset of first DTB block */
+-    dtb_offset = 12                       + /* header */
+-                 (entry_size * dtb_count) + /* DTB table entries */
+-                 4;                         /* end of table indicator */
++		if (!strcmp(arg,"--pagesize") || !strcmp(arg,"-s")) {
++			read_val;
++			pagesize = strtoul(val, 0, 10);
++			if ((pagesize != 2048) && (pagesize != 4096) && (pagesize != 8192) && (pagesize != 16384) && (pagesize != 32768) && (pagesize != 65536) && (pagesize != 131072))
++				fail("unsupported page size %d\n", pagesize);
++		} else if (!strcmp(arg, "--dtb") || !strcmp(arg, "-d")) {
++			read_val;
++			scan_dtb_path(dtb_files, val);
++		} else if (!strcmp(arg, "--output") || !strcmp(arg, "-o")) {
++			read_val;
++			dt_img = val;
++		} else if (!strcmp(arg, "--platform")) {
++			read_val;
++			dt_platform_code = strtoul(val, 0, 16);
++		} else if (!strcmp(arg, "--subtype")) {
++			read_val;
++			dt_subtype_code = strtoul(val, 0, 16);
++		} else if (*arg != '-') {
++			/* skip over already allocated file names */
++			for (; dtb_files[dt_count]; dt_count++)
++				if (dt_count >= DTB_MAX)
++					fail("reached dtb file limit (%d)", DTB_MAX);
+ 
+-    /* Round up to page size */
+-    padding = page_size - (dtb_offset % page_size);
+-    dtb_offset += padding;
+-    expected = dtb_offset;
++			dtb_files[dt_count] = strdup(arg);
++			if (!dtb_files[dt_count])
++				fail("failed to allocate memory");
++		} else
++			usage();
++	}
+ 
+-    /* Write index table:
+-         chipset
+-         platform
+-         subtype (v2/v3 only)
+-         soc rev
+-         pmic model0 (v3 only)
+-         pmic model1 (v3 only)
+-         pmic model2 (v3 only)
+-         pmic model3 (v3 only)
+-         dtb offset
+-         dtb size
+-     */
+-    for (chip = chip_list; chip; chip = chip->next) {
+-        wrote += write(out_fd, &chip->chipset, sizeof(uint32_t));
+-        wrote += write(out_fd, &chip->platform, sizeof(uint32_t));
+-        if (version >= 2) {
+-            wrote += write(out_fd, &chip->subtype, sizeof(uint32_t));
+-        }
+-        wrote += write(out_fd, &chip->revNum, sizeof(uint32_t));
+-        if (version >= 3) {
+-            wrote += write(out_fd, &chip->pmic_model[0], sizeof(uint32_t));
+-            wrote += write(out_fd, &chip->pmic_model[1], sizeof(uint32_t));
+-            wrote += write(out_fd, &chip->pmic_model[2], sizeof(uint32_t));
+-            wrote += write(out_fd, &chip->pmic_model[3], sizeof(uint32_t));
+-        }
+-        if (chip->master->master_offset != 0) {
+-            wrote += write(out_fd, &chip->master->master_offset, sizeof(uint32_t));
+-        } else {
+-            wrote += write(out_fd, &expected, sizeof(uint32_t));
+-            chip->master->master_offset = expected;
+-            expected += chip->master->dtb_size;
+-        }
+-        wrote += write(out_fd, &chip->master->dtb_size, sizeof(uint32_t));
+-    }
++	if (!dt_img) {
++		error("no output filename specified");
++		usage();
++	}
+ 
+-    rc = RC_SUCCESS;
+-    wrote += write(out_fd, &rc, sizeof(uint32_t)); /* end of table indicator */
+-    if (padding > 0)
+-        wrote += write(out_fd, filler, padding);
++	if (!dtb_files[0])
++		fail("no dtb files found");
+ 
+-    /* Write DTB's */
+-    for (chip = chip_list; chip; chip = chip->next) {
+-        if (chip->master->wroteDtb) {
+-            continue;
+-        }
++	dt_data = load_dtbh_block(dtb_files, pagesize, dt_platform_code, dt_subtype_code, &dt_size);
++	if (!dt_data)
++		fail("could not load device tree blobs");
+ 
+-        chip->master->wroteDtb = 1;
+-        filename = chip->master->dtb_file;
+-        dtb_size = chip->master->dtb_size;
++	fd = open(dt_img, O_CREAT | O_TRUNC | O_WRONLY, 0644);
++	if (fd < 0)
++		fail("could not create output file '%s': %s", dt_img, strerror(errno));
+ 
+-        log_dbg("\n (writing '%s' - %u bytes) ", filename, dtb_size);
+-        pInputFile = fopen(filename, "r");
+-        if (pInputFile != NULL) {
+-            totBytesRead = 0;
+-            while ((numBytesRead = fread(buf, 1, COPY_BLK, pInputFile)) > 0) {
+-                wrote += write(out_fd, buf, numBytesRead);
+-                totBytesRead += numBytesRead;
+-            }
+-            fclose(pInputFile);
+-            padding = page_size - (totBytesRead % page_size);
+-            if ((uint32_t)(totBytesRead + padding) != dtb_size) {
+-                log_err("DTB size mismatch, please re-run: expected %d vs actual %d (%s)\n",
+-                        dtb_size, totBytesRead + padding,
+-                        filename);
+-                rc = RC_ERROR;
+-                break;
+-            }
+-            if (padding > 0)
+-                wrote += write(out_fd, filler, padding);
+-        } else {
+-            log_err("failed to open DTB '%s'\n", filename);
+-            rc = RC_ERROR;
+-            break;
+-        }
+-    }
+-    close(out_fd);
++	if (write(fd, dt_data, dt_size) != dt_size) goto fail;
+ 
+-    if (expected != wrote) {
+-        log_err("error writing output file, please rerun: size mismatch %zu vs %zu\n",
+-                expected, wrote);
+-        rc = RC_ERROR;
+-    } else
+-        log_dbg("Total wrote %zu bytes\n", wrote);
++	close(fd);
+ 
+-    if (rc != RC_SUCCESS)
+-        unlink(output_file);
+-    else
+-        log_info("completed\n");
++	return 0;
+ 
+-cleanup:
+-    free(filler);
+-    chip_deleteall();
+-    return rc;
++fail:
++	unlink(dt_img);
++	close(fd);
++	fail("failed writing '%s': %s", dt_img, strerror(errno));
+ }

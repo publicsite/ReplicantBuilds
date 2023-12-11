@@ -1,0 +1,14 @@
+--- core/tasks/dt_image.mk.old	2023-03-05 20:15:53.368226166 +0000
++++ core/tasks/dt_image.mk	2023-04-03 12:19:41.594319380 +0000
+@@ -5,8 +5,10 @@
+ ifeq ($(strip $(BOARD_KERNEL_SEPARATED_DT)),true)
+ ifneq ($(strip $(BOARD_KERNEL_PREBUILT_DT)),true)
+ 
++include system/tools/dtbtool/Android.mk
++
+ ifeq ($(strip $(TARGET_CUSTOM_DTBTOOL)),)
+-DTBTOOL_NAME := dtbToolCM
++DTBTOOL_NAME := dtbToolLineage
+ else
+ DTBTOOL_NAME := $(TARGET_CUSTOM_DTBTOOL)
+ endif

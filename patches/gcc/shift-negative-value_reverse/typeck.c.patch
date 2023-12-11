@@ -1,0 +1,33 @@
+--- a/gcc/cp/typeck.c	2023-03-26 00:57:54.612453584 +0000
++++ b/gcc/cp/typeck.c	2023-03-26 00:29:45.841236888 +0000
+@@ -4448,11 +4448,20 @@
+ 	}
+       else if (code0 == INTEGER_TYPE && code1 == INTEGER_TYPE)
+ 	{
++	  tree const_op0 = fold_non_dependent_expr (op0);
++	  if (TREE_CODE (const_op0) != INTEGER_CST)
++	    const_op0 = op0;
+ 	  tree const_op1 = fold_non_dependent_expr (op1);
+ 	  if (TREE_CODE (const_op1) != INTEGER_CST)
+ 	    const_op1 = op1;
+ 	  result_type = type0;
+ 	  doing_shift = true;
++	  if (TREE_CODE (const_op0) == INTEGER_CST
++	      && tree_int_cst_sgn (const_op0) < 0
++	      && (complain & tf_warning)
++	      && c_inhibit_evaluation_warnings == 0)
++	    warning (OPT_Wshift_negative_value,
++		     "left shift of negative value");
+ 	  if (TREE_CODE (const_op1) == INTEGER_CST)
+ 	    {
+ 	      if (tree_int_cst_lt (const_op1, integer_zero_node))
+@@ -4470,6 +4479,9 @@
+ 		    warning (OPT_Wshift_count_overflow,
+ 			     "left shift count >= width of type");
+ 		}
++	      else if (TREE_CODE (const_op0) == INTEGER_CST
++		       && (complain & tf_warning))
++		maybe_warn_shift_overflow (location, const_op0, const_op1);
+ 	    }
+ 	  /* Avoid converting op1 to result_type later.  */
+ 	  converted = 1;

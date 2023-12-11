@@ -1,0 +1,249 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+REPLICANTDIR="${PWD}/replicant-6.0"
+
+	###redundant block {
+		###get gcc toolchain skeleton
+		##if [ -f "./gcc/get.sh" ]; then
+		##./gcc/get.sh
+		##fi
+
+		##if [ -f "./patches/kernel/get.sh" ]; then
+		##./patches/kernel/get.sh
+		##fi
+
+		##get gcc toolchain patches
+		#if [ -f "./patches/gcc/misleading-indentation/get.sh" ]; then
+		#	./patches/gcc/misleading-indentation/get.sh
+		#fi
+
+		###postmarket kernel {
+		##kerneltype="postmarketos-exynos4"
+		##
+		##./getPostmarketConfigs.sh
+		###postmarket kernel }
+	##redundant block }
+
+printf "This will require ~140GB\n"
+
+	##redundant block {
+		#sudo apt-get build-dep gcc binutils llvm-defaults
+
+		#Got the following errors on apt-get install
+		#E: Unable to locate package libemma-java
+		#E: Unable to locate package libandroidsdk-ddmlib-java
+		#E: Unable to locate package ca-cacert
+		#E: Unable to locate package zlib1g-dev:i386
+		#E: Unable to locate package libandroidsdk-sdklib-java
+		#E: Unable to locate package eclipse-jdt
+		#E: Unable to locate package libgradle-android-plugin-java
+
+		#sudo apt-get install kmod bash gcc-arm-none-eabi cmake python-dev swig ant bc proguard maven-debian-helper libasm4-java libguava-java libnb-platform18-java libnb-org-openide-util-java libmaven-source-plugin-java libfreemarker-java libmaven-javadoc-plugin-java curl gawk libgmp3-dev libmpfr-dev libmpc-dev git-core gperf libncurses-dev squashfs-tools pngcrush zip zlib1g-dev lzma libc6-dev-i386 g++-multilib lib32z1-dev lib32readline-dev lib32ncurses5-dev xsltproc python-mako schedtool gradle dirmngr android-sdk-build-tools android-sdk-platform-23 aapt lzop rsync
+	##redundant block }
+
+#starts here
+
+#use system certificates
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+source /usr/local/bin/repo-env.sh
+
+mkdir replicant-6.0
+cd replicant-6.0
+
+git config --global user.email "dontcall@me.com"
+git config --global user.name "Absolutely Anonymous"
+
+git clone https://git.replicant.us/contrib/scintill/manifest.git -b replicant-6.0 manifest
+
+cd manifest
+
+#fix broken links in manifest
+patch -p0 < ../../patches/scintill-default.xml.patch
+
+thedir="$PWD"
+git init
+git add default.xml
+git commit -m "My local manifest"
+cd ..
+repo init -u "${thedir}" -b replicant-6.0
+repo sync
+
+	###redundant block {
+		###get kernel (I couldn't put this in the manifest for some reason)
+		##mkdir -p replicant-6.0/kernel/replicant
+		##cd replicant-6.0/kernel/replicant
+		##git clone https://git.replicant.us/replicant-next/kernel_replicant_linux.git linux
+		##cd ../../../
+	###redundant block }
+
+#get fdroid prebuilt apps
+gpg --keyserver hkp://pgp.rediris.es --recv-key 37D2C98789D8311948394E3E41E7044E1DBA2E89
+vendor/replicant/get-prebuilts
+
+#i9305 patches {
+	thenewdefconfig="replicant_defconfig"
+	thenewdefconfigpath="${REPLICANTDIR}/kernel/replicant/linux/arch/arm/configs/${thenewdefconfig}"
+
+	#make selinux permissive on boot
+	sed -i "s#CONFIG_CMDLINE=\".*\"#CONFIG_CMDLINE=\"console=ttySAC2,115200 consoleblank=0 androidboot.hardware=smdk4x12 androidboot.selinux=permissive\"#g" "$thenewdefconfigpath"
+
+	#modem support
+	putInConfig "CONFIG_USB_NET_QMI_WWAN" "$thenewdefconfigpath"
+	putInConfig "CONFIG_USB_WDM" "$thenewdefconfigpath"
+
+	#adjust board.mk for replicant-next kernel
+	sed -i "s#TARGET_KERNEL_SOURCE := .*#TARGET_KERNEL_SOURCE := kernel/replicant/linux#g" ${REPLICANTDIR}/device/samsung/i9305/BoardConfig.mk
+	sed -i "s#TARGET_KERNEL_CONFIG := .*#TARGET_KERNEL_CONFIG := ${thenewdefconfig}#g" ${REPLICANTDIR}/device/samsung/i9305/BoardConfig.mk
+
+	cd replicant-6.0/device/samsung/i9305
+
+	##these patches were created with "diff -du"
+	##from the instructions at https://redmine.replicant.us/issues/1958
+	patch -p0 < ../../../../patches/init.target.rc.patch
+	patch -p0 < ../../../../patches/ueventd.smdk4x12.rc.patch
+	patch -p0 < ../../../../patches/i9305.mk.patch
+	patch -p0 < ../../../../patches/file_contexts.patch
+	patch -p0 < ../../../../patches/lineage.dependencies.patch
+
+	cp ../../../../patches/dbus.te selinux/dbus.te
+	cp ../../../../patches/file.te selinux/file.te
+	cp ../../../../patches/ofono.te selinux/ofono.te
+	cp ../../../../patches/radio.te selinux/radio.te
+	cp ../../../../patches/mdm9k.te selinux/mdm9k-efsd.te
+
+	cd ../../../../
+#i9305 patches }
+
+	###redundant block - postmarket kernel {
+		###create our postmarket/android hybrid kernel
+		##./processKernel.sh "linux-${kerneltype}"
+	###redundant block - postmarket kernel}
+
+	cd replicant-6.0
+
+	###these patches are not needed {
+		##patch -p0 < ../../../../patches/kernel_replicant_linux-Makefile.patch
+		##patch -p0 < ../../../../../../../patches/replicant_defconfig.patch
+	###these patches are not needed }
+
+#generic (scintill) replicant 6.0 patches {
+		##we're upgrading gcc, so remove Werror from .mk files, because new warnings treated as errors in gcc 6
+		#find . -type f -name "*.mk" -exec sed -i "s#-Werror ##g" {} \;
+		#find . -type f -name "*.mk" -exec sed -i "s/-Werror$//g" {} \;
+		#sed -i "s/\[-Werror,-Wincompatible-pointer-types-discards-qualifiers\]/\[-Wincompatible-pointer-types-discards-qualifiers\]/g" ./external/ppp/pppd/Android.mk
+	
+
+	#fix tinyalsa error {
+		cd external/tinyalsa
+		patch -p0 < ../../../patches/external_tinyalsa_pcm.c.patch
+	#fix tinyalsa error }
+
+	#fix 'insn does not satisfy its constraints' compiler error (to aid more recent kernel compilation) by upgrading gcc in the toolchain {
+				##redundant block {
+					##cd ../../vendor/replicant
+					##patch -p0 < ../../../patches/build-toolchain.patch
+					##cd ../../
+				##redundant block }
+
+			#if [ -d ../../toolchain/src/gcc ]; then
+				#rm -rf ../../toolchain/src/gcc
+			#fi
+
+			#mkdir -p ../../toolchain/src/gcc
+
+			#cd ../../toolchain/src/gcc
+
+			#cp -a ../../../../gcc/* .
+
+			##there might be a way of putting this in the manifest ... but I haven't done that
+			#git clone --branch releases/gcc-6.5.0 https://gcc.gnu.org/git/gcc.git gcc-6.5
+
+				##redundant block {
+					#cd gcc-6.5
+
+					##for shift-negative-value misleading-indentation nonnull-compare
+					#patch -p0 ../../../../../patches/gcc/c.opt.patch
+
+					##Remove shift-negative-value warning in gcc (treated as error in android/replicant) ...
+					## ... -Wno-error=shift-negative-value and -Wno-shift-negative-value did not work!
+					##introduced by https://gcc.gnu.org/git/?p=gcc.git&a=commit;h=0173bd2a038cbeef871b22b312a6856ab1dcda2a
+					#	find ../../../../../patches/gcc/shift-negative-value_reverse -name "*.patch" -exec patch -R -p1 -i {} \;
+
+
+					##Remove misleading-indentation warning in gcc (treated as error in android/replicant) ...
+					## ... -Wno-error=misleading-indentation and -Wno-misleading-indentation did not work!
+					#	patch -p0 ../../../../../patches/gcc/misleading-indentation/c-indentation.h.patch
+
+					#	sed -i "s#  warn_for_misleading_indentation (if_tinfo, body_tinfo, next_tinfo);##g" gcc/c/c-parser.c
+					#	sed -i "s#  warn_for_misleading_indentation (else_tinfo, body_tinfo, next_tinfo);##g" gcc/c/c-parser.c
+					#	sed -i "s#  warn_for_misleading_indentation (while_tinfo, body_tinfo, next_tinfo);##g" gcc/c/c-parser.c
+					#	sed -i "s#  warn_for_misleading_indentation (for_tinfo, body_tinfo, next_tinfo);##g" gcc/c/c-parser.c
+
+					#	sed -i "s#  warn_for_misleading_indentation (guard_tinfo, body_tinfo, next_tinfo);##g" gcc/cp/parser.c
+					#	sed -i "s#      warn_for_misleading_indentation (guard_tinfo, body_tinfo, next_tinfo);##g" gcc/cp/parser.c
+
+					#	##if [ -f "gcc/gcc-6.5/gcc/c-family/c-indentation.c" ]; then
+					#	##	rm gcc/gcc-6.5/gcc/c-family/c-indentation.c
+					#	##fi
+					#	##if [ -f "gcc/gcc-6.5/gcc/c-family/c-indentation.h" ]; then
+					#	##	rm gcc/gcc-6.5/gcc/c-family/c-indentation.h
+					#	##fi
+
+					##Remove nonnull-compare warning in gcc (treated as error in android/replicant) ...
+					## ... -Wno-error=nonnull-compare and -Wno-nonnull-compare did not work!
+					#patch -p0 ../../../../../patches/gcc/nonnull-compare/common.opt.patch
+
+					#cd ..
+				##redundant block }
+
+			##update android gcc toolchain files for newer gcc
+			#sed -i "s#4.9#6.5#g" build.py
+			#sed -i "s#4.9#6.5#g" update-prebuilts.py
+			#sed -i "s#4_9#6_5#g" README.version
+			#sed -i "s#-4.9#-6.5#g" build-gcc.sh
+			#sed -i "s#4\.9l#6\.5l#g" build-gcc.sh
+
+			#cd ..
+
+		#https://android.googlesource.com/platform/bionic/+/6f88821e5dc4894dc2905cbe53ae21c782354f38%5E%21/
+		cd ../../bionic
+		patch -p0 < ../../patches/uchar.h.patch
+
+		cd .. #now in the replicant-6.0 dir
+
+			#	#####redundant block {
+			#		#####use gnu++98 mode instead of gnu++14 for compatibility
+			#		####sed -i "s#TARGET_GLOBAL_CPPFLAGS += -fvisibility-inlines-hidden\\\#TARGET_GLOBAL_CPPFLAGS += -fvisibility-inlines-hidden -std=gnu++98 \\\#g" build/core/combo/TARGET_linux-arm.mk
+			#	#####redundant block }
+
+			##update build files to use newer gcc
+			#sed -i "s#4.9.x#6.5.\*#g" vendor/replicant/build-toolchain
+			#sed -i "s#4.9#6.5#g" vendor/replicant/build-toolchain
+			#sed -i "s#4.9#6.5#g" build/core/combo/TARGET_linux-x86_64.mk
+			#sed -i "s#4.9#6.5#g" build/core/combo/TARGET_linux-mips64.mk
+			#sed -i "s#4.9#6.5#g" build/core/combo/TARGET_linux-mips.mk
+			#sed -i "s#4.8 4.9,#4.8 4.9 5 5.1 5.1.% 5.2 5.2.% 5.3 5.3.% 5.4 5.4.% 5.5 5.5.% 6 6.0 6.1 6.1.% 6.2 6.2.% 6.3 6.3.% 6.4 6.4.% 6.5 6.5.%,#g" build/core/combo/TARGET_linux-arm.mk
+			#sed -i "s#TARGET_NDK_GCC_VERSION := 4.9#TARGET_NDK_GCC_VERSION := 6.5#g" build/core/combo/TARGET_linux-arm.mk
+			#sed -i "s#TARGET_GCC_VERSION := 4.9#TARGET_GCC_VERSION := 6.5#g" build/core/combo/TARGET_linux-arm.mk
+			#sed -i "s#TARGET_NDK_GCC_VERSION := 4.9#TARGET_NDK_GCC_VERSION := 6.5#g" build/core/combo/TARGET_linux-arm64.mk
+			#sed -i "s#TARGET_GCC_VERSION := 4.9#TARGET_GCC_VERSION := 6.5#g" build/core/combo/TARGET_linux-arm64.mk
+			#sed -i "s#4.9.x#6.5.0#g" build/core/clang/HOST_x86_common.mk
+			#sed -i "s#4.9#6.5#g" build/core/combo/TARGET_linux-x86.mk
+
+		cd .. #now in /Sources
+	#fix 'insn does not satisfy its constraints' compiler error (to aid more recent kernel compilation) by upgrading gcc in the toolchain }
+#generic (scintill) replicant 6.0 patches }
+
+	###these patches are not needed {
+		#cd ../../../../../../../../external/sepolicy
+
+		##I'm not really sure if this patch is needed.
+		##If you check dmesg, you find out that SELinux looks to be blocking some stuff.
+		##I mean, not just the stuff in this patch ...
+		##... but idk, it's what I did ...
+		## so ...
+		#patch -p0 < ../../../patches/init.te.patch
+	###these patches are not needed }

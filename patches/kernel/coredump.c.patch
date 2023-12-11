@@ -1,0 +1,20 @@
+diff --git a/fs/coredump.c b/fs/coredump.c
+index 7bad7785e8e6..8663042ebe9c 100644
+--- a/fs/coredump.c
++++ b/fs/coredump.c
+@@ -831,6 +831,7 @@  static int __dump_skip(struct coredump_params *cprm, size_t nr)
+ 	}
+ }
+ 
++#ifdef CONFIG_ELF_CORE
+ static int dump_emit_page(struct coredump_params *cprm, struct page *page)
+ {
+ 	struct bio_vec bvec = {
+@@ -863,6 +864,7 @@  static int dump_emit_page(struct coredump_params *cprm, struct page *page)
+ 
+ 	return 1;
+ }
++#endif
+ 
+ int dump_emit(struct coredump_params *cprm, const void *addr, int nr)
+ {

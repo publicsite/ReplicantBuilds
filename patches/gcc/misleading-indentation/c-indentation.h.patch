@@ -1,0 +1,12 @@
+--- gcc/c-family/c-indentation.h.old	2023-03-25 14:21:04.224709288 +0000
++++ gcc/c-family/c-indentation.h	2023-03-26 13:41:03.477891778 +0000
+@@ -44,9 +44,4 @@
+   return info;
+ }
+ 
+-extern void
+-warn_for_misleading_indentation (const token_indent_info &guard_tinfo,
+-				 const token_indent_info &body_tinfo,
+-				 const token_indent_info &next_tinfo);
+-
+ #endif  /* ! GCC_C_INDENTATION_H  */

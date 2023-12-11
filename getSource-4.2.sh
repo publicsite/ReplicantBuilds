@@ -17,13 +17,7 @@ printf "This will require ~140GB\n"
 
 #sudo apt-get install kmod bash gcc-arm-none-eabi cmake python-dev swig ant bc proguard maven-debian-helper libasm4-java libguava-java libnb-platform18-java libnb-org-openide-util-java libmaven-source-plugin-java libfreemarker-java libmaven-javadoc-plugin-java curl gawk libgmp3-dev libmpfr-dev libmpc-dev git-core gperf libncurses-dev squashfs-tools pngcrush zip zlib1g-dev lzma libc6-dev-i386 g++-multilib lib32z1-dev lib32readline-dev lib32ncurses5-dev xsltproc python-mako schedtool gradle dirmngr android-sdk-build-tools android-sdk-platform-23 aapt lzop rsync
 
-#wget "https://ftp.osuosl.org/pub/replicant/build-tools/repo/28-01-2021/sz1lkq3ryr5iv6amy6f3d2pziks27g28-tarball-pack.tar.xz"
-#if [ "$(sha512sum sz1lkq3ryr5iv6amy6f3d2pziks27g28-tarball-pack.tar.xz | cut -d " " -f 1)" != "def3c0b3ae2305d695b57d8d1f2fa8acfaf9b7c9c0f668c129a2bfe2652c24a8f2f8167d95f0d71a72d04601daac2b626bfecfae8e7833c812d912d95fd61a5a" ]; then
-#	printf "UHOH, BAD CHECKSUM\n"
-#	exit
-#fi
-
-sudo tar xf sz1lkq3ryr5iv6amy6f3d2pziks27g28-tarball-pack.tar.xz -C /
+#starts here:
 
 source /usr/local/bin/repo-env.sh
 

@@ -1,0 +1,13 @@
+--- pcm.c.old	2023-03-05 20:22:12.434929756 +0000
++++ pcm.c	2023-03-12 22:48:12.027601638 +0000
+@@ -51,6 +51,10 @@
+ #define PARAM_MAX SNDRV_PCM_HW_PARAM_LAST_INTERVAL
+ #define SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP (1<<2)
+ 
++#ifndef MAP_SHARED
++#define MAP_SHARED        0x01
++#endif
++
+ /* Logs information into a string; follows snprintf() in that
+  * offset may be greater than size, and though no characters are copied
+  * into string, characters are still counted into offset. */

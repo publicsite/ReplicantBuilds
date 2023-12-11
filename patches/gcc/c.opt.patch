@@ -1,0 +1,35 @@
+--- gcc/c-family/c.opt.old	2023-03-26 18:35:30.562698363 +0000
++++ gcc/c-family/c.opt	2023-03-26 18:31:51.712596386 +0000
+@@ -565,10 +565,6 @@
+ C ObjC C++ ObjC++ Var(warn_memset_transposed_args) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
+ Warn about suspicious calls to memset where the third argument is constant literal zero and the second is not.
+ 
+-Wmisleading-indentation
+-C C++ Common Var(warn_misleading_indentation) Warning LangEnabledBy(C C++,Wall)
+-Warn when the indentation of the code does not reflect the block structure.
+-
+ Wmissing-braces
+ C ObjC C++ ObjC++ Var(warn_missing_braces) Warning LangEnabledBy(C ObjC,Wall)
+ Warn about possibly missing braces around initializers.
+@@ -681,10 +677,6 @@
+ C ObjC C++ ObjC++ LangEnabledBy(C ObjC C++ ObjC++,Wall)
+ ;
+ 
+-Wnonnull-compare
+-C ObjC C++ ObjC++ LangEnabledBy(C ObjC C++ ObjC++,Wall)
+-;
+-
+ Wnormalized
+ C ObjC C++ ObjC++ Warning Alias(Wnormalized=,nfc,none)
+ ;
+@@ -836,10 +828,6 @@
+ C ObjC C++ ObjC++ Var(warn_shift_count_overflow) Init(1) Warning
+ Warn if shift count >= width of type.
+ 
+-Wshift-negative-value
+-C ObjC C++ ObjC++ Var(warn_shift_negative_value) Init(-1) Warning
+-Warn if left shifting a negative value.
+-
+ Wsign-compare
+ C ObjC C++ ObjC++ Var(warn_sign_compare) Warning LangEnabledBy(C++ ObjC++,Wall)
+ Warn about signed-unsigned comparisons.

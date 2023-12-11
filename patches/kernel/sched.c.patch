@@ -1,0 +1,25 @@
+--- kernel/sched/fair.c.old	2023-03-27 17:30:48.527484883 +0000
++++ kernel/sched/fair.c	2023-03-27 17:32:39.818505417 +0000
+@@ -5995,11 +5995,13 @@
+ 
+ static void set_next_buddy(struct sched_entity *se);
+ 
++
+ /*
+  * The dequeue_task method is called before nr_running is
+  * decreased. We remove the task from the rbtree and
+  * update the fair scheduling stats:
+  */
++#pragma GCC optimize ("O0")
+ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
+ {
+ 	struct cfs_rq *cfs_rq;
+@@ -6070,6 +6072,8 @@
+ 	hrtick_update(rq);
+ }
+ 
++#pragma GCC reset_options
++
+ #ifdef CONFIG_SMP
+ 
+ /* Working cpumask for: load_balance, load_balance_newidle. */

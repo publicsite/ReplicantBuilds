@@ -1,0 +1,13 @@
+--- lineage.dependencies.old	2023-02-25 17:20:56.971140266 +0000
++++ lineage.dependencies	2023-03-04 16:47:18.558316219 +0000
+@@ -8,8 +8,8 @@
+         "target_path": "device/samsung/smdk4412-qcom-common"
+     },
+     {
+-        "repository": "android_kernel_samsung_smdk4412",
+-        "target_path": "kernel/samsung/smdk4412"
++        "repository": "kernel_replicant_linux",
++        "target_path": "kernel/replicant/linux"
+     },
+     {
+         "repository": "android_hardware_samsung",

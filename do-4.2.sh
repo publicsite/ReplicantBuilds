@@ -1,13 +1,5 @@
 #!/bin/bash
 
-mknod /dev/null c 1 3
-chmod 666 /dev/null
-mknod -m 444 /dev/random c 1 8
-mknod -m 444 /dev/urandom c 1 9
-mkdir -v /dev/pts
-mount -vt devpts -o gid=4,mode=620 none /dev/pts
-mount proc /proc -t proc
-
 cd "$(dirname "$0")"
 
 thepwd="$PWD"
@@ -33,6 +25,3 @@ dpkg-reconfigure locales
 cd "$thepwd"
 
 su - live -c "$thepwd/build-4.2.sh"
-
-umount /dev/pts
-umount /proc

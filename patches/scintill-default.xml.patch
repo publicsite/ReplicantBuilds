@@ -1,0 +1,40 @@
+--- default.xml.old	2023-03-12 00:14:35.477467041 +0000
++++ default.xml	2023-03-12 00:22:19.690552357 +0000
+@@ -32,7 +32,6 @@
+   <project path="build" name="replicant/build.git" remote="replicant" groups="pdk" >
+     <copyfile src="core/root.mk" dest="Makefile" />
+   </project>
+-  <project path="manifest" name="replicant/manifest.git" remote="replicant" />
+   <project path="abi/cpp" name="LineageOS-mirror/android_abi_cpp.git" groups="pdk" />
+   <project path="art" name="LineageOS-mirror/android_art.git" groups="pdk" />
+   <project path="bionic" name="LineageOS-mirror/android_bionic.git" groups="pdk" />
+@@ -518,7 +517,8 @@
+ <project path="toolchain/src/jill" name="replicant/toolchain_jill.git" remote="replicant" />
+ 
+ <!-- KERNEL -->
+-  <project path="kernel/samsung/smdk4412" name="scintill/kernel_samsung_smdk4412.git" remote="replicant" revision="replicant-6.0" />
++  <project path="kernel/replicant/linux" name="replicant-next/kernel_replicant_linux.git" remote="replicant" revision="replicant-11" />
++  <project path="external/wireless-regdb" name="replicant-next/external_wireless-regdb.git" remote="replicant" revision="replicant-11" />
+   <project path="kernel/samsung/tuna" name="replicant/kernel_samsung_tuna.git" remote="replicant" />
+   <project path="kernel/samsung/espresso10" name="replicant/kernel_samsung_espresso10.git" remote="replicant" />
+ 
+@@ -527,8 +527,8 @@
+   <project path="device/samsung/n7000" name="replicant/device_samsung_n7000.git" remote="replicant" />
+   <project path="device/samsung/i9300" name="replicant/device_samsung_i9300.git" remote="replicant" />
+   <project path="device/samsung/i9305" name="replicant/device_samsung_i9305.git" remote="replicant" />
+-  <project path="device/samsung/t0lte" name="scintill/device_samsung_t0lte.git" remote="replicant" revision="replicant-6.0" />
+-  <project path="external/modem-boot" name="scintill/external_modem-boot.git" remote="replicant" revision="replicant-6.0" />
++  <project path="device/samsung/t0lte" name="contrib/scintill/device_samsung_t0lte.git" remote="replicant" revision="replicant-6.0" />
++  <project path="external/modem-boot" name="contrib/scintill/external_modem-boot.git" remote="replicant" revision="replicant-6.0" />
+   <project path="device/samsung/n7100" name="replicant/device_samsung_n7100.git" remote="replicant" />
+   <project path="device/samsung/n5100" name="replicant/device_samsung_n5100.git" remote="replicant" />
+   <project path="device/samsung/n5110" name="replicant/device_samsung_n5110.git" remote="replicant" />
+@@ -548,7 +548,7 @@
+   <project path="external/stlport" name="LineageOS-mirror/android_external_stlport.git" />
+ 
+ <!-- RIL_OFONO -->
+-  <project path="frameworks/opt/telephony_ril_ofono" name="scintill/frameworks_opt_telephony_ril_ofono" remote="replicant" revision="replicant-6.0" />
++  <project path="frameworks/opt/telephony_ril_ofono" name="contrib/scintill/frameworks_opt_telephony_ril_ofono" remote="replicant" revision="replicant-6.0" />
+   <project path="external/ofono" name="scintill/android_external_ofono" revision="master" remote="github" />
+   <project path="external/glib" name="scintill/android_external_glib" revision="2.32-android" remote="github" />
+   <project path="external/libiconv" name="scintill/android-libiconv" revision="master" remote="github" />

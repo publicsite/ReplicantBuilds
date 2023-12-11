@@ -1,0 +1,20 @@
+--- Makefile.old	2023-03-05 20:24:12.050306814 +0000
++++ Makefile	2023-03-12 02:09:48.968176462 +0000
+@@ -554,7 +554,6 @@
+ 		echo >&2 "***"; \
+ 		false; \
+ 	fi
+-	$(Q)ln -fsn $(srctree) source
+ 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile $(srctree)
+ 	$(Q)test -e .gitignore || \
+ 	{ echo "# this is build directory, ignore it"; echo "*"; } > .gitignore
+@@ -1435,9 +1434,7 @@
+ PHONY += _modinst_
+ _modinst_:
+ 	@rm -rf $(MODLIB)/kernel
+-	@rm -f $(MODLIB)/source
+ 	@mkdir -p $(MODLIB)/kernel
+-	@ln -s $(abspath $(srctree)) $(MODLIB)/source
+ 	@if [ ! $(objtree) -ef  $(MODLIB)/build ]; then \
+ 		rm -f $(MODLIB)/build ; \
+ 		ln -s $(CURDIR) $(MODLIB)/build ; \

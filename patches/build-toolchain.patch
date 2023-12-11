@@ -1,0 +1,31 @@
+--- build-toolchain.old	2023-03-05 20:28:43.737976510 +0000
++++ build-toolchain	2023-03-24 23:02:56.625725454 +0000
+@@ -61,28 +61,16 @@
+     --disable-libssp \
+     --enable-threads \
+     --disable-nls \
+-    --disable-libmudflap \
+-    --enable-libgomp \
+     --disable-libstdc__-v3 \
+-    --disable-sjlj-exceptions \
+     --disable-shared \
+-    --disable-tls \
+     --disable-libitm \
+     --with-float=soft \
+-    --with-fpu=vfp \
+     --with-arch=armv5te \
+-    --enable-target-optspace \
+-    --enable-initfini-array \
+     --disable-bootstrap \
+     --disable-libquadmath \
+-    --enable-plugins \
+     --with-sysroot=$BASEDIR/prebuilts/ndk/current/platforms/android-21/arch-arm \
+     --with-host-libstdcxx='-static-libgcc -Wl,-Bstatic,-lstdc++,-Bdynamic -lm' \
+-    --enable-gnu-indirect-function \
+     --disable-libsanitizer \
+-    --enable-graphite=yes \
+-    --enable-eh-frame-hdr-for-static \
+-    --enable-gold=default \
+     --program-transform-name='s&^&arm-linux-androideabi-&'
+ 
+ make -j $(nproc)

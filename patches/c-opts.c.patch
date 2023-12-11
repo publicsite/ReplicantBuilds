@@ -1,0 +1,15 @@
+--- gcc/c-family/c-opts.c.old	2023-03-25 14:21:04.232709521 +0000
++++ gcc/c-family/c-opts.c	2023-03-25 20:09:02.271594861 +0000
+@@ -868,10 +868,11 @@
+   if (warn_shift_overflow == -1)
+     warn_shift_overflow = cxx_dialect >= cxx11 || flag_isoc99;
+ 
+-  /* -Wshift-negative-value is enabled by -Wextra in C99 and C++11 modes.  */
++  /* -Wshift-negative-value is enabled by -Wextra in C99 and C++11 modes. DO NOT ENABLE THIS WHEN BUILDING ANDROID 6.0
+   if (warn_shift_negative_value == -1)
+     warn_shift_negative_value = (extra_warnings
+ 				 && (cxx_dialect >= cxx11 || flag_isoc99));
++  */
+ 
+   /* Declone C++ 'structors if -Os.  */
+   if (flag_declone_ctor_dtor == -1)
