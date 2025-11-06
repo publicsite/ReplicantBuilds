@@ -1,5 +1,8 @@
 #!/bin/bash
 
+OLD_UMASK="$(umask)"
+umask 0022
+
 mknod /dev/null c 1 3
 chmod 666 /dev/null
 mknod -m 444 /dev/random c 1 8
@@ -36,3 +39,5 @@ su - live -c "$thepwd/build-6.0.sh"
 
 umount /dev/pts
 umount /proc
+
+umask "${OLD_UMASK}"
