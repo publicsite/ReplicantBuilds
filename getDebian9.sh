@@ -1,4 +1,8 @@
 #!/bin/sh
+
+OLD_UMASK="$(umask)"
+umask 0022
+
 wget "http://cdimage.debian.org/cdimage/archive/9.13.0-live/amd64/iso-hybrid/debian-live-9.13.0-amd64-xfce.iso" -O "debian-live-9.13.0-amd64-xfce.iso"
 mkdir isomountpoint
 sudo mount -o loop "debian-live-9.13.0-amd64-xfce.iso" isomountpoint
@@ -23,3 +27,5 @@ sudo chroot /Sources/getSource-4.2.sh squashfs-root
 sudo chroot /Sources/do-4.2.sh squashfs-root
 sudo chroot /Sources/getSource-6.0.sh squashfs-root
 sudo chroot /Sources/do-6.0.sh squashfs-root
+
+umask "${OLD_UMASK}"
