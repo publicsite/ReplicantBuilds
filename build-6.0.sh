@@ -1,5 +1,8 @@
 #!/bin/bash
 
+OLD_UMASK="$(umask)"
+umask 0022
+
 cd "$(dirname "$0")"
 
 if [ -f 1.txt ]; then
@@ -128,3 +131,5 @@ make -j$parallel_tasks systemimage 2>&1 | tee "${thepwd}/3.txt"
 
 #to sign the images
 #./vendor/replicant/sign-build i9305
+
+umask "${OLD_UMASK}"
