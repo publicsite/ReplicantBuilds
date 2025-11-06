@@ -1,5 +1,8 @@
 #!/bin/bash
 
+OLD_UMASK="$(umask)"
+umask 0022
+
 cd "$(dirname "$0")"
 
 printf "This will require ~140GB\n"
@@ -62,4 +65,6 @@ cd ../../../external/sepolicy
 #... but idk, it's what I did ...
 # so ...
 patch -p0 < ../../../patches/init.te.patch
+
+umask "${OLD_UMASK}"
 
