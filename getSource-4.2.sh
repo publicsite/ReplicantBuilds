@@ -1,5 +1,8 @@
 #!/bin/bash
 
+OLD_UMASK="$(umask)"
+umask 0022
+
 cd "$(dirname "$0")"
 
 printf "This will require ~140GB\n"
@@ -56,4 +59,6 @@ repo sync
 ##get fdroid prebuilt apps
 #gpg --keyserver keys.gnupg.net --recv-key 37D2C98789D8311948394E3E41E7044E1DBA2E89
 #vendor/replicant/get-prebuilts
+
+umask "${OLD_UMASK}"
 
