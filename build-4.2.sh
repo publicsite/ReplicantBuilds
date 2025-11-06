@@ -1,5 +1,8 @@
 #!/bin/bash
 
+OLD_UMASK="$(umask)"
+umask 0022
+
 cd "$(dirname "$0")"
 
 if [ -f 1.txt ]; then
@@ -121,3 +124,5 @@ make -j$parallel_tasks recoveryimage 2>&1 | tee "${thepwd}/1.txt"
 ##replicant-4.2/out/target/product/crespo/boot.img
 make -j$parallel_tasks bootimage 2>&1 | tee "${thepwd}/2.txt"
 make -j$parallel_tasks systemimage 2>&1 | tee "${thepwd}/3.txt"
+
+umask "$[OLD_UMASK}"
