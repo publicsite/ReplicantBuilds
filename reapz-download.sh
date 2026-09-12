@@ -5,6 +5,10 @@ TMP="/tmp"
 # number of retries to clone git repo & download softwareheritage archive before giving up
 MAXRETRIES=10
 
+# print on stdout the usage of the script
+# parameters: -
+# return: -
+# output: print usage on stdout
 usage(){
 echo "======USAGE====="
 echo
@@ -18,6 +22,14 @@ echo "to use a reconstructed mirror to generate sources ready for building"
 echo
 }
 
+# get SoftwareHeritage repo content
+# parameters:
+#     CLONEURL  original repository URL to clone
+#     TARGZ     tar.gz file name into which downloading repository archive 
+# return: 
+#     0 if success
+#     1 else (could be more distinctive since return code is not currently used) TODO
+# output: -
 softwareheritageget(){
     CLONEURL="${1}"
     TARGZ="${2}"
@@ -65,6 +77,12 @@ softwareheritageget(){
 	fi
 }
 
+# TODO
+# parameters:
+#    ORIGINS:      TODO
+#    PROJECTNAME:  TODO
+# return: -
+# output: -
 deleteline(){
 	ORIGINS="${1}"
 	PROJECTNAME="${2}"
@@ -113,6 +131,22 @@ projectpath=""
 projectremote=""
 projectgroups=""
 
+# processes manifest XML of a project list/get every git subprojet
+#
+# parameters:
+#    OPTION:          sync to TODO, reconstructmirror to create a mirror of all repositories as tar.gz files, processsources to checkout repo on the declared revision branch & copy declared file
+#    MANIFEST:        path to the manifest XML file which includes the repositories to use
+#    MIRRORDIRECTORY: directory where the repo will be downloaded/found
+#    REALDIRMANIFEST: TODO
+# return: - TODO return error codes depending on the case
+# output: read a manifest XML file and:
+#     1. recursiverly processes repositories included
+#     2. concatenates
+#         a. remotes name, fetch & revision included
+#         b. default revision & remote
+#         c. project name, path, remote, groups & clone-depth
+#         d. for each project remote:
+#             * TODO: to be continued
 processxml(){
 	OPTION="${1}"
 	MANIFEST="${2}"
