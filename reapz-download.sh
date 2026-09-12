@@ -19,7 +19,7 @@ echo
 softwareheritageget(){
     CLONEURL="${1}"
     TARGZ="${2}"
-	if [ ! -d "$(dirname "${TARGZ}")" ]; then
+	if [ -f "${TARGZ}" ]; then
 		return 1
 	fi
 
