@@ -2,6 +2,8 @@
 
 # temporary directory where will be downloaded git repo
 TMP="/tmp" 
+# number of retries to clone git repo & download softwareheritage archive before giving up
+MAXRETRIES=10
 
 usage(){
 echo "======USAGE====="
@@ -284,12 +286,12 @@ processxml(){
 									retries="$(expr ${retries} + 1)"
 									sleep 60
 								fi
-								if [ "${retries}" = "10" ]; then
+								if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 									break
 								fi
 							done
 
-							if [ "${retries}" = "10" ]; then
+							if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 								retries=0
 								while true; do
 									softwareheritageget "${cloneurl}" "$(basename "$projectname").tar.gz"
@@ -343,7 +345,7 @@ processxml(){
 										retries="$(expr ${retries} + 1)"
 										sleep 60
 									fi
-									if [ "${retries}" = "10" ]; then
+									if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 										echo "UH OH. UNABLE TO DOWNLOAD FROM VANILLAS OR MIRRORS, EXITING."
 										exit 1
 									fi
@@ -383,12 +385,12 @@ processxml(){
 									retries="$(expr ${retries} + 1)"
 									sleep 60
 								fi
-								if [ "${retries}" = "10" ]; then
+								if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 									break
 								fi
 							done
 	
-							if [ "${retries}" = "10" ]; then
+							if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 								retries=0
 								while true; do
 									softwareheritageget "${cloneurl}" "$(basename "$projectname").tar.gz"
@@ -402,7 +404,7 @@ processxml(){
 										retries="$(expr ${retries} + 1)"
 										sleep 60
 									fi
-									if [ "${retries}" = "10" ]; then
+									if [ "${retries}" -eq "${MAXRETRIES}" ]; then
 										echo "UH OH. UNABLE TO DOWNLOAD FROM VANILLAS OR MIRRORS, EXITING."
 										exit 1
 									fi
